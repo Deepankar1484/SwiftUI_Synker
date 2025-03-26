@@ -5,12 +5,13 @@ struct CreateTimeCapsuleView: View {
     @Binding var isUpdated: Bool
     @State private var capsuleName: String = ""
     @State private var capsuleDescription: String = ""
-    @State private var deadline: Date = Date()
+    @State private var deadline: Date = Date().addingTimeInterval(86400)
     @State private var priority: Priority = .low
     @State private var subtasks: [Subtask] = []
     @State private var newSubtaskName: String = ""
     @State private var newSubtaskDescription: String = ""
-    @State private var showAlert: Bool = false // State to control the alert
+    @State private var showAlert: Bool = false // Alert for save confirmation
+    @State private var validationError: String? // State to hold validation messages
     var loggedUser: User?
 
     var body: some View {
@@ -22,7 +23,7 @@ struct CreateTimeCapsuleView: View {
                 }
 
                 Section(header: Text("Deadline & Priority")) {
-                    DatePicker("Deadline", selection: $deadline, displayedComponents: .date)
+                    DatePicker("Deadline", selection: $deadline, in: Date().addingTimeInterval(86400)..., displayedComponents: .date)
                     Picker("Priority", selection: $priority) {
                         ForEach(Priority.allCases, id: \.self) { priority in
                             Text(priority.rawValue.capitalized)
@@ -53,19 +54,34 @@ struct CreateTimeCapsuleView: View {
                             Divider()
                             TextField("Subtask Description", text: $newSubtaskDescription)
                         }
+                        
                         Button("Add") {
-                            if !newSubtaskName.isEmpty {
-                                let newSubtask = Subtask(subtaskName: newSubtaskName, description: newSubtaskDescription)
+                            let trimmedName = newSubtaskName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let trimmedDescription = newSubtaskDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                            if !trimmedName.isEmpty && !trimmedDescription.isEmpty {
+                                let newSubtask = Subtask(subtaskName: trimmedName, description: trimmedDescription)
                                 subtasks.append(newSubtask)
                                 newSubtaskName = ""
                                 newSubtaskDescription = ""
                             }
                         }
+                        .disabled(newSubtaskName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                  newSubtaskDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
 
+                if let error = validationError {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .padding()
+                }
+
                 Button(action: {
-                    showAlert = true // Show alert when button is pressed
+                    if validateInputs() {
+                        showAlert = true // Show confirmation alert
+                    }
                 }) {
                     Text("Add Time Capsule")
                         .frame(maxWidth: .infinity)
@@ -87,6 +103,32 @@ struct CreateTimeCapsuleView: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+    }
+
+    // MARK: - Validation Function
+    func validateInputs() -> Bool {
+        if capsuleName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            validationError = "Project name is required."
+            return false
+        }
+
+        if capsuleDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            validationError = "Description is required."
+            return false
+        }
+
+        if deadline <= Date() { // Ensuring date is at least tomorrow
+            validationError = "Deadline must be in the future."
+            return false
+        }
+
+        if subtasks.isEmpty {
+            validationError = "At least one subtask must be added."
+            return false
+        }
+
+        validationError = nil
+        return true
     }
 
     func saveTimeCapsule() {

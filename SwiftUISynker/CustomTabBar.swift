@@ -55,6 +55,7 @@ struct CustomTabBar: View {
                     }
                     .tag(3)
             }
+            .tint(.purple)
 
             // Floating Add Button
             VStack {

@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct AuthenticationView: View {
+    @AppStorage("isLoggedIn") private var isLoggedIn = false
     @State private var showLogin = true
-    @State private var isLoggedIn = false
     @State private var loggedUser: User?
 
     var body: some View {
@@ -12,7 +12,7 @@ struct AuthenticationView: View {
             if showLogin {
                 LoginView(toggleView: { showLogin = false }, onLoginSuccess: { user in
                     loggedUser = user
-                    isLoggedIn = true
+                    isLoggedIn = true // Set logged in state
                 })
             } else {
                 SignupView(toggleView: { showLogin = true })

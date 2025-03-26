@@ -197,7 +197,7 @@ struct HomeView: View {
                                 HStack {
                                     Text(category.rawValue)
                                         .font(.title3.bold())
-                                        .foregroundColor(.purple)
+                                        .foregroundColor(Color(category.customCategory.categoryColor))
                                     
                                     Spacer()
                                     
@@ -208,7 +208,7 @@ struct HomeView: View {
                                         .clipShape(Circle())
                                     
                                     Image(systemName: expandedCategories.contains(category) ? "chevron.down" : "chevron.right")
-                                        .foregroundColor(.purple)
+                                        .foregroundColor(Color(category.customCategory.categoryColor))
                                         .font(.system(size: 16, weight: .bold))
                                 }
                                 .padding()
@@ -266,7 +266,7 @@ struct HomeView: View {
                                 HStack {
                                     Text(priority.rawValue)
                                         .font(.title3.bold())
-                                        .foregroundColor(.purple)
+                                        .foregroundColor(Color(priority.tintColor))
                                     
                                     Spacer()
                                     
@@ -277,7 +277,7 @@ struct HomeView: View {
                                         .clipShape(Circle())
                                     
                                     Image(systemName: expandedPriorities.contains(priority) ? "chevron.down" : "chevron.right")
-                                        .foregroundColor(.purple)
+                                        .foregroundColor(Color(priority.tintColor))
                                         .font(.system(size: 16, weight: .bold))
                                 }
                                 .padding()

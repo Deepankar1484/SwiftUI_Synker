@@ -12,6 +12,7 @@ struct ProfileView: View {
     @State private var isEditing = false
     @State private var showLogoutAlert = false
     @State private var showDeleteAlert = false
+    @AppStorage("isLoggedIn") private var isLoggedIn = false
     @Environment(\.presentationMode) var presentationMode // To navigate back
 
     var body: some View {
@@ -98,12 +99,19 @@ struct ProfileView: View {
 
     // MARK: - Logout Function
     private func logout() {
-        presentationMode.wrappedValue.dismiss() // Navigate back to authentication page
+        isLoggedIn = false
     }
 
     // MARK: - Delete Account Function
     private func deleteAccount() {
-        presentationMode.wrappedValue.dismiss() // Navigate back to authentication page
+        let taskModel = TaskDataModel.shared
+//        print(taskModel.getUser(by: loggedUser.userId) ?? "good")
+        let checkDelete = taskModel.deleteUser(loggedUser.userId)
+        if checkDelete{
+            isLoggedIn = false
+        } else {
+            print("Error deleting account!")
+        }
     }
 }
 

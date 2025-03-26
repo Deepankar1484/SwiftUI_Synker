@@ -63,6 +63,17 @@ func getMarch17Date() -> Date {
     return calendar.date(from: dateComponents) ?? Date() // Fallback to current date if nil
 }
 
+func getMarchDate(day: Int) -> Date {
+    let calendar = Calendar.current
+    var dateComponents = DateComponents()
+    dateComponents.year = calendar.component(.year, from: Date()) // Use the current year
+    dateComponents.month = 3
+    dateComponents.day = day
+
+    return calendar.date(from: dateComponents) ?? Date() // Fallback to current date if nil
+}
+
+
 // MARK: - Enums
 enum Priority: String,CaseIterable {
     case low = "Low"
@@ -71,7 +82,7 @@ enum Priority: String,CaseIterable {
     
     var tintColor: UIColor {
         switch self {
-        case .low: return .green
+        case .low: return .systemGreen
         case .medium: return .orange
         case .high: return .red
         }
@@ -407,6 +418,39 @@ class TaskDataModel {
             }
         }
     }
+    
+    func deleteUser(_ userId: UUID) -> Bool {
+        if let index = users.firstIndex(where: { $0.userId == userId }) {
+
+            // Remove all tasks and time capsules associated with the user
+            deleteTasks(for: userId)
+            deleteTimeCapsules(for: userId)
+
+            // Remove the user
+            users.remove(at: index)
+            // If the deleted user is the current user, log them out
+            if currentUser?.userId == userId {
+                currentUser = nil
+            }
+            return true
+        }
+        return false
+    }
+    
+    func deleteTasks(for userId: UUID) {
+        if let user = users.first(where: { $0.userId == userId }) {
+            tasks.removeAll { user.taskIds.contains($0.id) }
+//            print("All tasks for user \(userId) have been deleted.")
+        }
+    }
+    
+    func deleteTimeCapsules(for userId: UUID) {
+        if let user = users.first(where: { $0.userId == userId }) {
+            timeCapsules.removeAll { user.timeCapsuleIds.contains($0.id) }
+//            print("All time capsules for user \(userId) have been deleted.")
+        }
+    }
+
     
     // MARK: - Task Management
     
@@ -779,11 +823,56 @@ class TaskDataModel {
             alert: .tenMinutes,
             category: .others
         )
+        let task4 = UserTask(
+            taskName: "Lunch Break",
+            description: "Have a healthy meal and relax",
+            startTime: "01:00 PM",
+            endTime: "01:30 PM",
+            date: getMarch17Date(),
+            priority: .low,
+            alert: .none,
+            category: .habits
+        )
+        let task5 = UserTask(
+            taskName: "Code Review",
+            description: "Review pull requests and provide feedback",
+            startTime: "03:00 PM",
+            endTime: "04:00 PM",
+            date: getMarchDate(day: 24),
+            priority: .high,
+            alert: .fifteenMinutes,
+            category: .meetings
+        )
+        let task6 = UserTask(
+            taskName: "Evening Jog",
+            description: "Run 5km in the park",
+            startTime: "06:30 PM",
+            endTime: "07:00 PM",
+            date: getMarchDate(day: 23),
+            priority: .medium,
+            alert: .tenMinutes,
+            category: .sports
+        )
+        let task7 = UserTask(
+            taskName: "Read a Book",
+            description: "Read at least 20 pages of a self-improvement book",
+            startTime: "09:00 PM",
+            endTime: "09:30 PM",
+            date: getMarchDate(day: 27),
+            priority: .low,
+            alert: .fiveMinutes,
+            category: .habits
+        )
+
         
         // Add tasks to the sample user
         _ = addTask(task1, for: sampleUser.userId)
         _ = addTask(task2, for: sampleUser.userId)
         _ = addTask(task3, for: sampleUser.userId)
+        _ = addTask(task4, for: sampleUser.userId)
+        _ = addTask(task5, for: sampleUser.userId)
+        _ = addTask(task6, for: sampleUser.userId)
+        _ = addTask(task7, for: sampleUser.userId)
         
         // Sample time capsule
         let capsule1 = TimeCapsule(
