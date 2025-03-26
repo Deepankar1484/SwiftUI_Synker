@@ -43,10 +43,6 @@ struct CreateTaskView: View {
                 
                 // Section 3: Priority, Alert & Category
                 Section(header: Text("Additional Options")) {
-                    Picker("Priority", selection: $priority) {
-                        ForEach(Priority.allCases, id: \.self) { Text($0.rawValue) }
-                    }
-                    
                     Picker("Alert", selection: $alert) {
                         ForEach(Alert.allCases, id: \.self) { Text($0.rawValue) }
                     }
@@ -54,6 +50,27 @@ struct CreateTaskView: View {
                     Picker("Category", selection: $category) {
                         ForEach(Category.allCases, id: \.self) { Text($0.rawValue) }
                     }
+                    HStack {
+                        Text("Priority")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .leading) // Align text to left
+                        
+                        HStack(spacing: 15) {
+                            ForEach(Priority.allCases, id: \.self) { level in
+                                Image(systemName: "flag.circle.fill")
+                                    .resizable()
+                                    .frame(width: priority == level ? 40 : 30, // Larger size for selected flag
+                                           height: priority == level ? 40 : 30)
+                                    .foregroundColor(Color(level.tintColor)) // Apply tint color
+                                    .opacity(priority == level ? 1 : 0.5) // Dim unselected flags
+                                    .onTapGesture {
+                                        priority = level
+                                    }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing) // Align flags to right
+                    }
+                    .padding(.vertical, 5)
                 }
                 
                 // Save Button

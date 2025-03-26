@@ -6,7 +6,7 @@ struct CustomTabBar: View {
     @State private var isCreateTimeCapsulePresented = false // State to show CreateTaskView
     @State private var isUpdated = false // State to show CreateTaskView
     @State private var isUpdatedTimeCapsule = false // State to show CreateTaskView
-    var loggedUser: User?  // User is now passed
+    @State var loggedUser: User?  // User is now passed
     
     var body: some View {
         ZStack {
@@ -41,7 +41,13 @@ struct CustomTabBar: View {
                     .tag(2)
 
                 NavigationView {
-                    ProfileView()
+                    ProfileView(loggedUser: loggedUser ?? User(
+                        name: "Guest",
+                        email: "guest@example.com",
+                        password: "",
+                        phone: "N/A",
+                        settings: Settings(usage: .personal, bedtime: "10:00 PM", wakeUpTime: "6:00 AM", notificationsEnabled: true)
+                    ))
                 }
                     .tabItem {
                         Image(systemName: "person.fill")
@@ -65,10 +71,14 @@ struct CustomTabBar: View {
                 }
             }
         }
-        .sheet(isPresented: $isCreateTaskPresented) {
+        .sheet(isPresented: $isCreateTaskPresented, onDismiss: {
+            isUpdated = false
+        }) {
             CreateTaskView(isUpdated: $isUpdated, loggedUser: loggedUser)
         }
-        .sheet(isPresented: $isCreateTimeCapsulePresented) {
+        .sheet(isPresented: $isCreateTimeCapsulePresented, onDismiss: {
+            isUpdatedTimeCapsule = false
+        }) {
             CreateTimeCapsuleView(isUpdated: $isUpdatedTimeCapsule,loggedUser: loggedUser)
         }
     }
@@ -121,11 +131,5 @@ struct AddTimeCapsuleButton: View {
 struct AwardsView: View {
     var body: some View {
         Text("Awards Screen").font(.largeTitle)
-    }
-}
-
-struct ProfileView: View {
-    var body: some View {
-        Text("Profile Screen").font(.largeTitle)
     }
 }

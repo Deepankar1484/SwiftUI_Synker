@@ -71,7 +71,7 @@ enum Priority: String,CaseIterable {
     
     var tintColor: UIColor {
         switch self {
-        case .low: return UIColor(red: 0.7, green: 0.9, blue: 0.7, alpha: 1.0)
+        case .low: return .green
         case .medium: return .orange
         case .high: return .red
         }
@@ -95,7 +95,7 @@ enum Alert: String,CaseIterable {
     case oneHour = "1 hour"
 }
 
-enum Usage: String {
+enum Usage: String,CaseIterable {
     case personal = "Personal"
     case work = "Work"
     case education = "Education"
@@ -236,7 +236,7 @@ struct User {
 }
 
 struct Settings {
-//    let profilePicture: String
+    var profilePicture: String?
     var usage: Usage
     var bedtime: String
     var wakeUpTime: String
@@ -729,9 +729,10 @@ class TaskDataModel {
         
         // Sample user
         let sampleSettings = Settings(
+            profilePicture: "person.fill",
             usage: .personal,
-            bedtime: "22:00",
-            wakeUpTime: "06:00",
+            bedtime: "22:00 PM",
+            wakeUpTime: "06:00 AM",
             notificationsEnabled: true
         )
         

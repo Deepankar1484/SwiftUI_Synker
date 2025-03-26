@@ -5,13 +5,14 @@ struct HomeView: View {
     @State private var selectedSegment: TaskViewType = .all
     @State private var selectedDate = Date()
     @State var loggedUser: User?
-    // Sample tasks (replace with actual data source)
+    @State private var expandedCategories: Set<Category> = []
+    @State private var expandedPriorities: Set<Priority> = []
     let taskModel = TaskDataModel.shared
     
     @State var tasks: [UserTask] = [
-        UserTask(taskName: "Go Gym and do some exercises", description: "Workout session", startTime: "5:00PM", endTime: "6:30AM", date: Date(), priority: .high, alert: .oneHour, category: .sports, isCompleted: true),
-        UserTask(taskName: "I want to study OOPs in C++", description: "Study Session", startTime: "6:00PM", endTime: "7:30PM", date: Date(), priority: .medium, alert: .oneHour, category: .study),
-        UserTask(taskName: "Attend a meeting", description: "Work discussion", startTime: "10:00AM", endTime: "11:30AM", date: getMarch17Date(), priority: .high, alert: .oneHour, category: .work)
+//        UserTask(taskName: "Go Gym and do some exercises", description: "Workout session", startTime: "5:00PM", endTime: "6:30AM", date: Date(), priority: .high, alert: .oneHour, category: .sports, isCompleted: true),
+//        UserTask(taskName: "I want to study OOPs in C++", description: "Study Session", startTime: "6:00PM", endTime: "7:30PM", date: Date(), priority: .medium, alert: .oneHour, category: .study),
+//        UserTask(taskName: "Attend a meeting", description: "Work discussion", startTime: "10:00AM", endTime: "11:30AM", date: getMarch17Date(), priority: .high, alert: .oneHour, category: .work)
     ]
     
     var body: some View {
@@ -31,9 +32,9 @@ struct HomeView: View {
         .onAppear {
             guard let x = loggedUser else { return }
             tasks = taskModel.getAllTasks(for: x.userId)
+            loggedUser = taskModel.getUser(by: x.userId)
         }
     }
-    
     // MARK: - Header View
     private var headerView: some View {
         ZStack {
@@ -98,6 +99,8 @@ struct HomeView: View {
                         }
                     }
                 }
+                
+                
             }
 
         }
@@ -170,40 +173,146 @@ struct HomeView: View {
 
     // MARK: - Category View
     private var categoryView: some View {
-        return VStack(spacing: 10) {
+        VStack(spacing: 10) {
             ForEach(Category.allCases, id: \.self) { category in
-                let count = tasks.filter { $0.category == category && $0.date.isSameDay(as: selectedDate) }.count
-                categoryTile(title: category.rawValue, count: count)
+                let categoryTasks = tasks.filter { $0.category == category && $0.date.isSameDay(as: selectedDate) }
+                
+                if !categoryTasks.isEmpty {
+                    VStack {
+                        // Header Button for Expand/Collapse
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.3)) {
+                                if expandedCategories.contains(category) {
+                                    expandedCategories.remove(category)
+                                } else {
+                                    expandedCategories.insert(category)
+                                }
+                            }
+                        }) {
+                            HStack {
+                                Text(category.rawValue)
+                                    .font(.title3.bold())
+                                    .foregroundColor(.purple) // Category Name in Purple
+                                
+                                Spacer()
+                                
+                                Text("\(categoryTasks.count)")
+                                    .padding(8)
+                                    .background(Color.black) // Background Purple
+                                    .foregroundColor(.white) // White Text
+                                    .clipShape(Circle())
+                                
+                                // Custom Expand Arrow (Inside the Box)
+                                Image(systemName: expandedCategories.contains(category) ? "chevron.down" : "chevron.right")
+                                    .foregroundColor(.purple) // Purple Arrow
+                                    .font(.system(size: 16, weight: .bold))
+                                    .rotationEffect(expandedCategories.contains(category) ? .degrees(180) : .degrees(0)) // Smooth Rotate
+                            }
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.2)))
+                        }
+                        
+                        // Expandable Content with Animation
+                        if expandedCategories.contains(category) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                ForEach(categoryTasks) { task in
+                                    NavigationLink(destination: TaskDetailView(task: task, loggedUser: loggedUser)) {
+                                        TaskRow(task: task)
+                                            .padding(.vertical, 3)
+                                            .transition(.move(edge: .top).combined(with: .opacity)) // Smooth transition
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.leading, 10)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
         }
     }
+
 
     // MARK: - Priority View
     private var priorityView: some View {
-        return VStack(spacing: 10) {
+        VStack(spacing: 10) {
             ForEach(Priority.allCases, id: \.self) { priority in
-                let count = tasks.filter { $0.priority == priority && $0.date.isSameDay(as: selectedDate) }.count
-                categoryTile(title: priority.rawValue, count: count)
+                let priorityTasks = tasks.filter { $0.priority == priority && $0.date.isSameDay(as: selectedDate) }
+                
+                if !priorityTasks.isEmpty {
+                    VStack {
+                        // Header Button for Expand/Collapse
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.3)) {
+                                if expandedPriorities.contains(priority) {
+                                    expandedPriorities.remove(priority)
+                                } else {
+                                    expandedPriorities.insert(priority)
+                                }
+                            }
+                        }) {
+                            HStack {
+                                Text(priority.rawValue)
+                                    .font(.title3.bold())
+                                    .foregroundColor(.purple) // Priority Name in Purple
+                                
+                                Spacer()
+                                
+                                Text("\(priorityTasks.count)")
+                                    .padding(8)
+                                    .background(Color.purple) // Background Purple
+                                    .foregroundColor(.white) // White Text
+                                    .clipShape(Circle())
+                                
+                                // Custom Expand Arrow (Inside the Box)
+                                Image(systemName: expandedPriorities.contains(priority) ? "chevron.down" : "chevron.right")
+                                    .foregroundColor(.purple) // Purple Arrow
+                                    .font(.system(size: 16, weight: .bold))
+                                    .rotationEffect(expandedPriorities.contains(priority) ? .degrees(180) : .degrees(0)) // Smooth Rotate
+                            }
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.2)))
+                        }
+                        
+                        // Expandable Content with Animation
+                        if expandedPriorities.contains(priority) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                ForEach(priorityTasks) { task in
+                                    NavigationLink(destination: TaskDetailView(task: task, loggedUser: loggedUser)) {
+                                        TaskRow(task: task)
+                                            .padding(.vertical, 3)
+                                            .transition(.move(edge: .top).combined(with: .opacity)) // Smooth transition
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                            .padding(.leading, 10)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
         }
     }
 
+
     // MARK: - Category Tile
-    private func categoryTile(title: String, count: Int) -> some View {
-        HStack {
-            Text(title)
-                .font(.title3.bold())
-            Spacer()
-            Text("\(count)")
-                .padding(8)
-                .background(Color.black)
-                .foregroundColor(.white)
-                .clipShape(Circle())
-        }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
-        .padding(.horizontal)
-    }
+//    private func categoryTile(title: String, count: Int) -> some View {
+//        HStack {
+//            Text(title)
+//                .font(.title3.bold())
+//            Spacer()
+//            Text("\(count)")
+//                .padding(8)
+//                .background(Color.black)
+//                .foregroundColor(.white)
+//                .clipShape(Circle())
+//        }
+//        .padding()
+//        .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
+//        .padding(.horizontal)
+//    }
 }
 
 // MARK: - Enums

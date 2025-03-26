@@ -23,7 +23,7 @@ struct TaskRow: View {
                         .scaledToFit()
                         .frame(width: 40, height: 40) // Bigger icon
                         .foregroundColor(.white)
-                        .padding(.leading)
+//                        .padding(.leading,)
                     
                 } else{
                     Image(systemName: task.category.taskImage)
@@ -31,7 +31,7 @@ struct TaskRow: View {
                         .scaledToFit()
                         .frame(width: 40, height: 40) // Bigger icon
                         .foregroundColor(.white)
-                        .padding(.leading)
+//                        .padding(.leading)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {

@@ -3,11 +3,12 @@ import SwiftUI
 struct TimeCapsuleScreen: View {
     @State private var timeCapsules: [TimeCapsule] = []
     @State private var subtasks: [UUID: [Subtask]] = [:]
-    @State private var selectedFilter: TaskFilter = .active
+    @State private var selectedFilter: TaskFilter = .allCapsules
     let taskModel = TaskDataModel.shared
-    var loggedUser: User?
+    @State var loggedUser: User?
     
     enum TaskFilter {
+        case allCapsules
         case active
         case completed
     }
@@ -36,47 +37,27 @@ struct TimeCapsuleScreen: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     // Segmented picker for filtering
                     Picker("Task Filter", selection: $selectedFilter) {
+                        Text("All Capsules").tag(TaskFilter.allCapsules)
                         Text("Active").tag(TaskFilter.active)
                         Text("Completed").tag(TaskFilter.completed)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
                     
-                    // Display filtered capsules
+                    // Filtered Capsules List
                     let filteredCapsules = getFilteredCapsules()
                     if !filteredCapsules.isEmpty {
-                        if selectedFilter == .active {
-                            // For active, exclude the top capsule from the list
-                            let topCapsuleId = getActiveCapsules().min(by: { $0.deadline < $1.deadline })?.id
-                            let otherActiveCapsules = filteredCapsules.filter { $0.id != topCapsuleId }
-                            
-                            if !otherActiveCapsules.isEmpty {
-                                LazyVStack(spacing: 10) {
-                                    ForEach(otherActiveCapsules, id: \.id) { capsule in
-                                        
-                                        NavigationLink(destination: TimeCapsuleDetailView(capsule: capsule,loggedUser: loggedUser , subtasks: subtasks[capsule.id] ?? [])) {
-                                            CapsuleItemView(capsule: capsule)
-                                            .padding(.horizontal)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                            }
-                        } else {
-                            // For completed, show all completed tasks
-                            LazyVStack(spacing: 10) {
-                                ForEach(filteredCapsules, id: \.id) { capsule in
-                                    NavigationLink(destination: TimeCapsuleDetailView(capsule: capsule, subtasks: subtasks[capsule.id] ?? [])) {
-                                        CapsuleItemView(capsule: capsule)
+                        LazyVStack(spacing: 10) {
+                            ForEach(filteredCapsules, id: \.id) { capsule in
+                                NavigationLink(destination: TimeCapsuleDetailView(capsule: capsule, loggedUser: loggedUser, subtasks: subtasks[capsule.id] ?? [])) {
+                                    CapsuleItemView(capsule: capsule)
                                         .padding(.horizontal)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
+                                .buttonStyle(PlainButtonStyle())
                             }
                         }
                     } else {
-                        // No tasks message
-                        Text(selectedFilter == .active ? "No active tasks" : "No completed tasks")
+                        Text("No capsules found")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -104,6 +85,8 @@ struct TimeCapsuleScreen: View {
                 }
             }
         }
+//        guard let x = loggedUser else { return }
+//        loggedUser = taskModel.getUser(by: x.userId)
     }
     
     // Get active capsules (not 100% completed)
@@ -119,10 +102,12 @@ struct TimeCapsuleScreen: View {
     // Get filtered capsules based on selected filter
     private func getFilteredCapsules() -> [TimeCapsule] {
         switch selectedFilter {
+        case .allCapsules:
+            return timeCapsules
         case .active:
-            return getActiveCapsules()
+            return timeCapsules.filter { $0.completionPercentage > 0 && $0.completionPercentage < 100 }
         case .completed:
-            return getCompletedCapsules()
+            return timeCapsules.filter { $0.completionPercentage == 100 }
         }
     }
 }
