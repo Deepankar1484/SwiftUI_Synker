@@ -78,6 +78,10 @@ struct UpdateTaskView: View {
                 }
             }
             .navigationTitle("Update Task")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(leading: Button("Cancel") {
+                presentationMode.wrappedValue.dismiss()
+            })
             .alert("Invalid Input", isPresented: $showValidationAlert) {
                 Button("OK", role: .cancel) {}
             } message: {

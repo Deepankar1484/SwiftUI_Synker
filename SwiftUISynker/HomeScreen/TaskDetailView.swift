@@ -23,6 +23,9 @@ struct TaskDetailView: View {
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.purple)
+                    Image(systemName: "flag.circle")
+                        .font(.system(size: 20, weight: .bold)) // Bigger & Bolder
+                        .foregroundColor(Color(task.priority.tintColor))
                     Spacer()
                     Text("\(task.startTime) - \(task.endTime)")
                         .font(.callout)

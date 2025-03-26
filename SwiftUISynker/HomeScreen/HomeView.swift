@@ -318,7 +318,7 @@ struct HomeView: View {
                         .padding()
                 } else {
                     ForEach(overdueTasks) { task in
-                        NavigationLink(destination: TaskDetailView(task: task, loggedUser: loggedUser)) {
+                        NavigationLink(destination: OverdueDetailsView(loggedUser: loggedUser, task: task)) {
                             TaskRow(task: task)
                                 .padding(.vertical, 5)
                         }
