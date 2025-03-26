@@ -503,7 +503,7 @@ class TaskDataModel {
     }
     
     func fetchOverdueTasks(for userId: UUID) -> [UserTask] {
-        let today = Date()
+        let today = Calendar.current.startOfDay(for: Date())
         return getAllTasks(for: userId).filter { $0.date < today && !$0.isCompleted }
     }
     
