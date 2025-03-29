@@ -119,8 +119,8 @@ struct TimeCapsuleDetailView: View {
                             .fontWeight(.semibold)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
+                            .background(Color.purple.opacity(0.1))
+                            .foregroundColor(.purple)
                             .cornerRadius(20)
                     }
                     .padding(.horizontal)

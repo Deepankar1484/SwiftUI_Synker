@@ -38,7 +38,8 @@ struct CreateTaskView: View {
                 Section(header: Text("Date & Time")) {
                     DatePicker("Start Time", selection: $startTime, displayedComponents: .hourAndMinute)
                     DatePicker("End Time", selection: $endTime, displayedComponents: .hourAndMinute)
-                    DatePicker("Select Date", selection: $taskDate, displayedComponents: .date)
+//                    DatePicker("Select Date", selection: $taskDate, displayedComponents: .date)
+                    DatePicker("Select Date", selection: $taskDate, in: Date()..., displayedComponents: .date)
                 }
                 
                 // Section 3: Priority, Alert & Category

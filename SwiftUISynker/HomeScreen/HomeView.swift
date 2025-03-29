@@ -12,7 +12,7 @@ struct HomeView: View {
     @State var tasks: [UserTask] = [
 //        UserTask(taskName: "Go Gym and do some exercises", description: "Workout session", startTime: "5:00PM", endTime: "6:30AM", date: Date(), priority: .high, alert: .oneHour, category: .sports, isCompleted: true),
 //        UserTask(taskName: "I want to study OOPs in C++", description: "Study Session", startTime: "6:00PM", endTime: "7:30PM", date: Date(), priority: .medium, alert: .oneHour, category: .study),
-//        UserTask(taskName: "Attend a meeting", description: "Work discussion", startTime: "10:00AM", endTime: "11:30AM", date: getMarch17Date(), priority: .high, alert: .oneHour, category: .work)
+        UserTask(taskName: "Attend a meeting", description: "Work discussion", startTime: "10:00AM", endTime: "11:30AM", date: Date(), priority: .high, alert: .oneHour, category: .work)
     ]
     
     var body: some View {
@@ -110,12 +110,35 @@ struct HomeView: View {
     // MARK: - Task List
     private var taskList: some View {
         VStack(alignment: .center) {
-            Text("My Tasks")
-                .font(.title.bold())
-                .padding(.top)
-            
+            HStack {
+                Text("My Tasks")
+                    .font(.title.bold())
+
+                Spacer()
+
+                Text("\(completedTaskCount)/\(totalTaskCount)")
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.purple.opacity(0.1))
+                    .foregroundColor(.purple)
+                    .cornerRadius(20)
+            }
+            .padding()
+
             segemntedTasks
         }
+    }
+
+    // MARK: - Task Count Computation
+    private var completedTaskCount: Int {
+        let todayTasks = tasks.filter { $0.date.isSameDay(as: selectedDate) }
+        return todayTasks.filter { $0.isCompleted }.count
+    }
+
+    private var totalTaskCount: Int {
+        return tasks.filter { $0.date.isSameDay(as: selectedDate) }.count
     }
     
     private var segemntedTasks: some View {
@@ -150,6 +173,20 @@ struct HomeView: View {
     private var allTasksView: some View {
         VStack {
             let todayTasks = tasks.filter { $0.date.isSameDay(as: selectedDate) }
+                .sorted { first, second in
+                    if !first.isCompleted && second.isCompleted {
+                        return true
+                    } else if first.isCompleted && !second.isCompleted {
+                        return false
+                    } else {
+                        // Compare by start time
+                        guard let firstTime = Date.fromTimeString(first.startTime),
+                              let secondTime = Date.fromTimeString(second.startTime) else {
+                            return false
+                        }
+                        return firstTime < secondTime
+                    }
+                }
             
             if todayTasks.isEmpty {
                 Image("notaskimage")

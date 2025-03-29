@@ -6,6 +6,8 @@ struct OverdueDetailsView: View {
     @State var task: UserTask // Task details
     @State private var showEditView = false
     @State private var isUpdated = false
+    @State private var showRescheduleAlert = false
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -43,7 +45,7 @@ struct OverdueDetailsView: View {
                 
                 Text("**Scheduled Date:**")
                     .font(.headline)
-                Text(task.date.fullFormattedString ())
+                Text(task.date.fullFormattedString())
                     .padding(.bottom, 10)
                     .foregroundColor(.primary)
                 
@@ -62,17 +64,38 @@ struct OverdueDetailsView: View {
                 
                 Spacer()
                 
+                
+                Button(action: {
+                    showRescheduleAlert = true
+                }) {
+                    Text("Reschedule for Today")
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.purple)
+                        .cornerRadius(8)
+                }
+                .alert("Reschedule Task", isPresented: $showRescheduleAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Done") {
+                        rescheduleTaskForToday()
+                    }
+                } message: {
+                    Text("Are you sure you want to reschedule this task for today?")
+                }
+                
                 Button(action: {
                     showEditView = true
-                    print("clicked")
                 }) {
-                    Text("Re-schedule Task")
+                    Text("Reschedule Task")
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.red)
                         .cornerRadius(8)
                 }
+                .padding(.bottom, 10)
+                
             }
             .padding()
         }
@@ -85,6 +108,13 @@ struct OverdueDetailsView: View {
                 presentationMode.wrappedValue.dismiss() // Dismiss OverdueDetailsView when task is updated
             }
         }
+    }
+    
+    private func rescheduleTaskForToday() {
+        task.date = Date() // Set task date to today
+        let taskModel = TaskDataModel.shared
+        taskModel.updateTask(task)
+        isUpdated = true // Trigger update
     }
 }
 

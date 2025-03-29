@@ -118,6 +118,8 @@ enum Category: String, CaseIterable {
     case work = "Work"
     case meetings = "Meetings"
     case habits = "Habits"
+    case gym = "Gym"
+    case relax = "Relax"
     case others = "Others"
     
     
@@ -183,6 +185,30 @@ enum Category: String, CaseIterable {
                 4. Breaking bad habits requires replacing them with positive alternatives.
                 """
             )
+        case .gym:
+            return CustomCategory(
+                category: self,
+                categoryName: "Gym",
+                categoryColor: UIColor.systemYellow, // Consider using blue for a fitness-related theme
+                insights: """
+                1. Progressive overload is key to building strength and muscle.
+                2. Proper form is more important than lifting heavier weights.
+                3. Rest and recovery are essential for muscle growth and injury prevention.
+                4. Nutrition plays a crucial role in fitness progress.
+                """
+            )
+        case .relax:
+            return CustomCategory(
+                category: self,
+                categoryName: "Relax",
+                categoryColor: UIColor.systemTeal, // A fun and vibrant color for entertainment
+                insights: """
+                1. Taking breaks with entertainment boosts creativity and reduces stress.
+                2. Balance is key—too much screen time can affect productivity and sleep.
+                3. Engaging in different forms of entertainment (movies, music, books) enhances well-being.
+                4. Social entertainment, like games or events, strengthens relationships and teamwork.
+                """
+            )
         case .others:
             return CustomCategory(
                 category: self,
@@ -203,7 +229,9 @@ enum Category: String, CaseIterable {
         case .study: return "books.vertical"
         case .sports: return "figure.run"
         case .meetings: return "person.line.dotted.person"
-        case .habits: return "arrow.trianglehead.2.clockwise"
+        case .habits: return "arrow.triangle.2.circlepath"
+        case .gym: return "dumbbell"
+        case .relax: return "film.fill"
         case .others: return "Others"
         }
     }
@@ -807,7 +835,7 @@ class TaskDataModel {
             taskName: "Team Meeting",
             description: "Weekly project status update",
             startTime: "10:00 AM",
-            endTime: "11:00 AM",
+            endTime: "11:00 PM",
             date: Date(),
             priority: .medium,
             alert: .tenMinutes,
