@@ -58,7 +58,7 @@ func getMarch17Date() -> Date {
     var dateComponents = DateComponents()
     dateComponents.year = calendar.component(.year, from: Date()) // Current year
     dateComponents.month = 3
-    dateComponents.day = 23
+    dateComponents.day = 20
 
     return calendar.date(from: dateComponents) ?? Date() // Fallback to current date if nil
 }
@@ -73,6 +73,15 @@ func getMarchDate(day: Int) -> Date {
     return calendar.date(from: dateComponents) ?? Date() // Fallback to current date if nil
 }
 
+func getAprilDate(day: Int) -> Date {
+    let calendar = Calendar.current
+    var dateComponents = DateComponents()
+    dateComponents.year = calendar.component(.year, from: Date()) // Use the current year
+    dateComponents.month = 4
+    dateComponents.day = day
+    
+    return calendar.date(from: dateComponents) ?? Date() // Fallback to current date if nil
+}
 
 // MARK: - Enums
 enum Priority: String,CaseIterable {
@@ -245,7 +254,6 @@ struct CustomCategory {
 }
 
 // MARK: - Models
-
 struct User {
     var userId: UUID
     var name: String
@@ -258,8 +266,9 @@ struct User {
     var maxStreak: Int
     var settings: Settings
     var awardsEarned: [AwardsEarned] // Store award IDs instead of full awards
+    var lastDateModified: Date // Track last date streak was updated
     
-    init(userId: UUID = UUID(), name: String, email: String, password: String, phone: String, totalStreak: Int = 0, maxStreak: Int = 0, settings: Settings) {
+    init(userId: UUID = UUID(), name: String, email: String, password: String, phone: String, totalStreak: Int = 0, maxStreak: Int = 0, settings: Settings, lastDateModified: Date = Date()) {
         self.userId = userId
         self.name = name
         self.email = email
@@ -271,6 +280,7 @@ struct User {
         self.maxStreak = maxStreak
         self.settings = settings
         self.awardsEarned = []
+        self.lastDateModified = lastDateModified
     }
 }
 
@@ -363,12 +373,11 @@ struct Subtask {
 }
 
 struct Award { //these are the awards that we have.
-    var awardId: UUID
+    var id = UUID()
     var awardName: String
     var description: String
     
-    init(awardId: UUID = UUID(), awardName: String, description: String) {
-        self.awardId = awardId
+    init(awardName: String, description: String) {
         self.awardName = awardName
         self.description = description
     }
@@ -447,6 +456,67 @@ class TaskDataModel {
         }
     }
     
+    func updateStreak(for userId: UUID) {
+        guard var user = getUser(by: userId) else { return }
+        let today = Date()
+        let calendar = Calendar.current
+
+        // Check if it's a new month
+        if let lastModifiedMonth = calendar.dateComponents([.year, .month], from: user.lastDateModified).month,
+           let todayMonth = calendar.dateComponents([.year, .month], from: today).month,
+           let lastModifiedYear = calendar.dateComponents([.year], from: user.lastDateModified).year,
+           let todayYear = calendar.dateComponents([.year], from: today).year,
+           (todayMonth != lastModifiedMonth || todayYear != lastModifiedYear) {
+            
+            // Award user if they were consistent last month
+            let previousMonth = calendar.date(byAdding: .month, value: -1, to: today)!
+            let range = calendar.range(of: .day, in: .month, for: previousMonth)!
+            let totalDaysLastMonth = range.count
+            
+            let tasksCompletedAllDays = (1...totalDaysLastMonth).allSatisfy { day in
+                if let date = calendar.date(from: DateComponents(year: todayYear, month: todayMonth - 1, day: day)) {
+                    let tasks = getTasksByDate(for: userId, date: date)
+                    return !tasks.isEmpty && tasks.allSatisfy { $0.isCompleted }
+                }
+                return false
+            }
+
+            if tasksCompletedAllDays {
+                awardUserForMonth(userId: user.userId, month: lastModifiedMonth, year: lastModifiedYear)
+                // update the user to new user as the award is earned
+                if let updatedUser = getUser(by: user.userId) {
+                    user = updatedUser
+                }
+            }
+            // Reset streak for the new month
+            user.totalStreak = 0
+            user.maxStreak = 0
+        }
+
+        // Skip update if already done today
+        if user.lastDateModified.isSameDay(as: today) { return }
+
+        // Update streak for the current month
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: today))!
+        var currentDate = max(user.lastDateModified, startOfMonth)
+
+        while let nextDate = calendar.date(byAdding: .day, value: 1, to: currentDate), nextDate <= today {
+            let tasksForTheDay = getTasksByDate(for: userId, date: currentDate)
+            let allCompleted = !tasksForTheDay.isEmpty && tasksForTheDay.allSatisfy { $0.isCompleted }
+            if allCompleted {
+                user.totalStreak += 1
+                user.maxStreak = max(user.maxStreak, user.totalStreak)
+            } else {
+                user.totalStreak = 0 // Reset streak if any task is incomplete
+            }
+            currentDate = nextDate
+        }
+
+        // Update last modified date to today
+        user.lastDateModified = today
+        updateUser(user)
+    }
+
     func deleteUser(_ userId: UUID) -> Bool {
         if let index = users.firstIndex(where: { $0.userId == userId }) {
 
@@ -479,9 +549,7 @@ class TaskDataModel {
         }
     }
 
-    
     // MARK: - Task Management
-    
     func getAllTasks(for userId: UUID) -> [UserTask] {
         return tasks.filter { task in
             if let user = getUser(by: userId) {
@@ -741,7 +809,7 @@ class TaskDataModel {
     }
     
     func getAward(by awardId: UUID) -> Award? {
-        return awards.first { $0.awardId == awardId }
+        return awards.first { $0.id == awardId }
     }
     
     func getUserAwards(for userId: UUID) -> [Award] {
@@ -778,6 +846,22 @@ class TaskDataModel {
         return true
     }
     
+    func awardUserForMonth(userId: UUID, month: Int, year: Int) {
+        let monthAwardName = "Perfect Month \(year)-\(month)"
+        let monthAwardDescription = "Completed all tasks for \(month)-\(year)"
+        
+        // Check if the award already exists
+        if let existingAward = awards.first(where: { $0.awardName == monthAwardName }) {
+            _ = awardUser(userId: userId, awardId: existingAward.id)
+        } else {
+            // Create a new award
+            let newAward = Award(awardName: monthAwardName, description: monthAwardDescription)
+            awards.append(newAward)
+            _ = awardUser(userId: userId, awardId: newAward.id)
+        }
+    }
+
+    
     // MARK: - Helper Methods
     
     func getTodayDayIndex() -> Int {
@@ -791,13 +875,33 @@ class TaskDataModel {
     
     // MARK: - Private Methods
     
+    func addCompletedTasksForMarch(userId: UUID) {
+        for day in 1...31 {
+            let taskDate = getMarchDate(day: day) // Directly use the returned Date
+
+            let completedTask = UserTask(
+                taskName: "Daily March Task",
+                description: "Completed a task on March \(day).",
+                startTime: "08:00 AM",
+                endTime: "08:30 AM",
+                date: taskDate,
+                priority: .low,
+                alert: .none,
+                category: .others,
+                isCompleted: true
+            )
+            _ = addTask(completedTask, for: userId)
+        }
+    }
+    
     private func setupSampleData() {
         // Sample awards
-        let award1 = Award(awardName: "First Task Completed", description: "Completed your first task")
-        let award2 = Award(awardName: "5-Day Streak", description: "Completed tasks for 5 consecutive days")
-        let award3 = Award(awardName: "Time Master", description: "Completed 10 time capsules")
+        let award1 = Award(awardName: "Welcome Badge", description: "Small wins lead to big success! Keep completing tasks and earning more badges.")
+//        let award2 = Award(awardName: "5-Day Streak", description: "Completed tasks for 5 consecutive days")
+//        let award3 = Award(awardName: "Time Master", description: "Completed 1 time capsule")
+//        let award4 = Award(awardName: "Time Master", description: "Completed 5 time capsule")
         
-        awards = [award1, award2, award3]
+        awards = [award1]
         
         // Sample user
         let sampleSettings = Settings(
@@ -813,7 +917,8 @@ class TaskDataModel {
             email: "a@gmail.com",
             password: "123456",
             phone: "+1234567890",
-            settings: sampleSettings
+            settings: sampleSettings,
+            lastDateModified: getMarch17Date()
         )
         
         users.append(sampleUser)
@@ -830,7 +935,6 @@ class TaskDataModel {
             category: .sports,
             isCompleted: true
         )
-        
         let task2 = UserTask(
             taskName: "Team Meeting",
             description: "Weekly project status update",
@@ -846,40 +950,44 @@ class TaskDataModel {
             description: "Weekly project status update",
             startTime: "10:00 PM",
             endTime: "11:00 PM",
-            date: getMarch17Date(),
+            date: getMarchDate(day: 31),
             priority: .medium,
             alert: .tenMinutes,
-            category: .others
+            category: .others,
+            isCompleted: true
         )
         let task4 = UserTask(
             taskName: "Lunch Break",
             description: "Have a healthy meal and relax",
             startTime: "01:00 PM",
             endTime: "01:30 PM",
-            date: getMarch17Date(),
+            date: getMarchDate(day: 31),
             priority: .low,
             alert: .none,
-            category: .habits
+            category: .habits,
+            isCompleted: true
         )
         let task5 = UserTask(
             taskName: "Code Review",
             description: "Review pull requests and provide feedback",
             startTime: "03:00 PM",
             endTime: "04:00 PM",
-            date: getMarchDate(day: 24),
+            date: getMarchDate(day: 30),
             priority: .high,
             alert: .fifteenMinutes,
-            category: .meetings
+            category: .meetings,
+            isCompleted: true
         )
         let task6 = UserTask(
             taskName: "Evening Jog",
             description: "Run 5km in the park",
             startTime: "06:30 PM",
             endTime: "07:00 PM",
-            date: getMarchDate(day: 23),
+            date: getMarchDate(day: 30),
             priority: .medium,
             alert: .tenMinutes,
-            category: .sports
+            category: .sports,
+            isCompleted: true
         )
         let task7 = UserTask(
             taskName: "Read a Book",
@@ -889,7 +997,8 @@ class TaskDataModel {
             date: getMarchDate(day: 27),
             priority: .low,
             alert: .fiveMinutes,
-            category: .habits
+            category: .habits,
+            isCompleted: true
         )
 
         
@@ -901,6 +1010,8 @@ class TaskDataModel {
         _ = addTask(task5, for: sampleUser.userId)
         _ = addTask(task6, for: sampleUser.userId)
         _ = addTask(task7, for: sampleUser.userId)
+        
+        addCompletedTasksForMarch(userId: sampleUser.userId)
         
         // Sample time capsule
         let capsule1 = TimeCapsule(
@@ -956,6 +1067,6 @@ class TaskDataModel {
         _ = addSubtask(subtask9, to: capsule3.id)
         
         // Award the user
-        _ = awardUser(userId: sampleUser.userId, awardId: award1.awardId)
+        _ = awardUser(userId: sampleUser.userId, awardId: award1.id)
     }
 }

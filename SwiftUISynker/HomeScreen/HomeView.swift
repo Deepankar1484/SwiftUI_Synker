@@ -19,13 +19,10 @@ struct HomeView: View {
         ScrollView (showsIndicators: false){
             // Header Section
             headerView
-            
             // Weekly Dates Picker
             weekView
-            
             // Task List
             taskList
-            
             Spacer()
         }
         .padding()
@@ -33,6 +30,12 @@ struct HomeView: View {
             guard let x = loggedUser else { return }
             tasks = taskModel.getAllTasks(for: x.userId)
             loggedUser = taskModel.getUser(by: x.userId)
+            taskModel.updateStreak(for: x.userId)
+            if let x = loggedUser {
+                if let y = taskModel.getUser(by: x.userId) {
+                    print(y)
+                }
+            }
         }
     }
     // MARK: - Header View
@@ -105,7 +108,6 @@ struct HomeView: View {
 
         }
     }
-
 
     // MARK: - Task List
     private var taskList: some View {
@@ -273,7 +275,6 @@ struct HomeView: View {
             }
         }
     }
-
 
     // MARK: - Priority View
     private var priorityView: some View {

@@ -126,11 +126,3 @@ struct AddTimeCapsuleButton: View {
         .offset(y: -30) // Move button above the tab bar
     }
 }
-
-// MARK: - Placeholder Views for Tabs
-
-struct AwardsView: View {
-    var body: some View {
-        Text("Awards Screen").font(.largeTitle)
-    }
-}
