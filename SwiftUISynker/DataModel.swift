@@ -383,7 +383,7 @@ struct Award { //these are the awards that we have.
     }
 }
 
-struct AwardsEarned {
+struct AwardsEarned: Identifiable{
     var id: UUID // Added for consistency
     var awardId: UUID // Renamed from award for consistency
     var dateEarned: Date
@@ -935,6 +935,7 @@ class TaskDataModel {
             category: .sports,
             isCompleted: true
         )
+        
         let task2 = UserTask(
             taskName: "Team Meeting",
             description: "Weekly project status update",
@@ -945,28 +946,31 @@ class TaskDataModel {
             alert: .tenMinutes,
             category: .meetings
         )
+        
         let task3 = UserTask(
             taskName: "Project Work",
             description: "Weekly project status update",
             startTime: "10:00 PM",
             endTime: "11:00 PM",
-            date: getMarchDate(day: 31),
+            date: getAprilDate(day: 1),
             priority: .medium,
             alert: .tenMinutes,
             category: .others,
             isCompleted: true
         )
+        
         let task4 = UserTask(
             taskName: "Lunch Break",
             description: "Have a healthy meal and relax",
             startTime: "01:00 PM",
             endTime: "01:30 PM",
-            date: getMarchDate(day: 31),
+            date: getAprilDate(day: 1),
             priority: .low,
             alert: .none,
             category: .habits,
             isCompleted: true
         )
+        
         let task5 = UserTask(
             taskName: "Code Review",
             description: "Review pull requests and provide feedback",
@@ -978,6 +982,7 @@ class TaskDataModel {
             category: .meetings,
             isCompleted: true
         )
+        
         let task6 = UserTask(
             taskName: "Evening Jog",
             description: "Run 5km in the park",
@@ -989,6 +994,7 @@ class TaskDataModel {
             category: .sports,
             isCompleted: true
         )
+        
         let task7 = UserTask(
             taskName: "Read a Book",
             description: "Read at least 20 pages of a self-improvement book",

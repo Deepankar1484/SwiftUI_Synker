@@ -32,7 +32,7 @@ struct CustomTabBar: View {
                     .tag(1)
 
                 NavigationView {
-                    AwardsView()
+                    AwardsView(loggedUser: loggedUser)
                 }
                     .tabItem {
                         Image(systemName: "checkmark.seal.fill")

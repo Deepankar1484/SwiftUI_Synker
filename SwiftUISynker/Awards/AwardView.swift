@@ -4,89 +4,69 @@
 //
 //  Created by Deepankar Garg on 29/03/25.
 //
-
 import SwiftUI
 
 struct AwardsView: View {
-    @State private var currentStreak: Int = 0
-    @State private var maxStreak: Int = 0
-    
-    let allAwards: [Award] = [
-        Award(awardName: "First Task Completed", description: "Completed your first task"),
-        Award(awardName: "5-Day Streak", description: "Completed tasks for 5 consecutive days"),
-        Award(awardName: "Time Master", description: "Completed 10 time capsules")
-    ]
-    
-    let earnedAwards: [AwardsEarned] = [
-        AwardsEarned(awardId: UUID(), dateEarned: Date())
-    ]
-    
-    var lockedAwards: [Award] {
-        allAwards.filter { award in
-            !earnedAwards.contains(where: { $0.awardId == award.id })
-        }
-    }
-    
+    @State var loggedUser: User?
+
+    @State private var allAwards: [Award] = []
+
     var body: some View {
         VStack(alignment: .leading) {
             Text("Awards")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.horizontal)
-            
+
             // Streak Stats
             HStack {
-                StreakCard(title: "Current streak", value: "\(currentStreak) Days", icon: "flame.fill")
-                StreakCard(title: "Max streak", value: "\(maxStreak) Days", icon: "flame.fill")
+                StreakCard(title: "Current streak", value: "\(loggedUser?.totalStreak ?? 0) Days", icon: "flame.fill")
+                StreakCard(title: "Max streak", value: "\(loggedUser?.maxStreak ?? 0) Days", icon: "flame.fill")
             }
             .padding(.horizontal)
-            
+
+            // Show Earned Awards Only
             SectionHeader(title: "Earned Awards")
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 15) {
-                    ForEach(earnedAwards, id: \ .id) { award in
-                        if let matchingAward = allAwards.first(where: { $0.id == award.awardId }) {
-                            AwardCard(award: matchingAward, dateEarned: award.dateEarned)
+
+            if let earnedAwards = loggedUser?.awardsEarned, !earnedAwards.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 15) {
+                        ForEach(earnedAwards) { earned in
+                            if let matchingAward = allAwards.first(where: { $0.id == earned.awardId }) {
+                                AwardCard(award: matchingAward, dateEarned: earned.dateEarned)
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
+            } else {
+                Text("No awards earned yet.")
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
             }
-            
-            SectionHeader(title: "Locked Awards")
-            
-            List {
-                ForEach(lockedAwards, id: \ .id) { award in
-                    LockedAwardRow(award: award)
-                }
+
+            Spacer()
+        }
+        .onAppear(){
+            let taskModel = TaskDataModel.shared
+            allAwards = taskModel.getAllAwards()
+            if let x = loggedUser {
+                loggedUser = taskModel.getUser(by: x.userId)
             }
-            .listStyle(PlainListStyle())
         }
-        .onAppear {
-            updateStreaks()
-        }
-    }
-    
-    private func updateStreaks() {
-        // Add logic to calculate streaks dynamically
-        currentStreak = 6
-        maxStreak = 96
     }
 }
 
 // Section Header Component
 struct SectionHeader: View {
     let title: String
-    
+
     var body: some View {
         HStack {
             Text(title)
                 .font(.title3)
                 .fontWeight(.bold)
             Spacer()
-            Button("See All") {}
-                .foregroundColor(.blue)
         }
         .padding(.horizontal)
     }
@@ -97,7 +77,7 @@ struct StreakCard: View {
     let title: String
     let value: String
     let icon: String
-    
+
     var body: some View {
         VStack {
             HStack {
@@ -121,7 +101,7 @@ struct StreakCard: View {
 struct AwardCard: View {
     let award: Award
     let dateEarned: Date
-    
+
     var body: some View {
         VStack {
             Image(systemName: "star.fill")
@@ -129,17 +109,17 @@ struct AwardCard: View {
                 .scaledToFit()
                 .frame(width: 100, height: 100)
                 .foregroundColor(.yellow)
-            
+
             Text(award.awardName)
                 .font(.subheadline)
                 .fontWeight(.bold)
-            
+
             Text(formatDate(dateEarned))
                 .font(.caption)
                 .foregroundColor(.gray)
         }
     }
-    
+
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -147,32 +127,6 @@ struct AwardCard: View {
     }
 }
 
-// Locked Award Row
-struct LockedAwardRow: View {
-    let award: Award
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "lock.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 50, height: 50)
-                .foregroundColor(.gray)
-                
-            VStack(alignment: .leading) {
-                Text(award.awardName)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                Text(award.description)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-#Preview {
-    AwardsView()
-}
+//#Preview {
+//    AwardsView()
+//}
