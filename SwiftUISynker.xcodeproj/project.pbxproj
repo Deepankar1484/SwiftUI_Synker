@@ -6,13 +6,34 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DB6FE5AE2D9D12500046DB83 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = DB6FE5AD2D9D12500046DB83 /* FirebaseAuth */; };
+		DB6FE5B02D9D12500046DB83 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = DB6FE5AF2D9D12500046DB83 /* FirebaseCore */; };
+		DB6FE5B22D9D12500046DB83 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = DB6FE5B12D9D12500046DB83 /* FirebaseDatabase */; };
+		DB6FE5B42D9D12500046DB83 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = DB6FE5B32D9D12500046DB83 /* FirebaseFirestore */; };
+		DB6FE5B62D9D12500046DB83 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = DB6FE5B52D9D12500046DB83 /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		9DAF6F932D8AE03B004A9F84 /* SwiftUISynker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftUISynker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		67A4B1472DA8D47200668F95 /* Exceptions for "SwiftUISynker" folder in "SwiftUISynker" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9DAF6F922D8AE03B004A9F84 /* SwiftUISynker */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9DAF6F952D8AE03B004A9F84 /* SwiftUISynker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				67A4B1472DA8D47200668F95 /* Exceptions for "SwiftUISynker" folder in "SwiftUISynker" target */,
+			);
 			path = SwiftUISynker;
 			sourceTree = "<group>";
 		};
@@ -23,6 +44,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DB6FE5B22D9D12500046DB83 /* FirebaseDatabase in Frameworks */,
+				DB6FE5B42D9D12500046DB83 /* FirebaseFirestore in Frameworks */,
+				DB6FE5B02D9D12500046DB83 /* FirebaseCore in Frameworks */,
+				DB6FE5B62D9D12500046DB83 /* FirebaseStorage in Frameworks */,
+				DB6FE5AE2D9D12500046DB83 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +91,11 @@
 			);
 			name = SwiftUISynker;
 			packageProductDependencies = (
+				DB6FE5AD2D9D12500046DB83 /* FirebaseAuth */,
+				DB6FE5AF2D9D12500046DB83 /* FirebaseCore */,
+				DB6FE5B12D9D12500046DB83 /* FirebaseDatabase */,
+				DB6FE5B32D9D12500046DB83 /* FirebaseFirestore */,
+				DB6FE5B52D9D12500046DB83 /* FirebaseStorage */,
 			);
 			productName = SwiftUISynker;
 			productReference = 9DAF6F932D8AE03B004A9F84 /* SwiftUISynker.app */;
@@ -94,6 +125,9 @@
 			);
 			mainGroup = 9DAF6F8A2D8AE03B004A9F84;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9DAF6F942D8AE03B004A9F84 /* Products */;
 			projectDirPath = "";
@@ -254,6 +288,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"SwiftUISynker/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwiftUISynker/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -282,6 +317,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"SwiftUISynker/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwiftUISynker/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -322,6 +358,45 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.11.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DB6FE5AD2D9D12500046DB83 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		DB6FE5AF2D9D12500046DB83 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		DB6FE5B12D9D12500046DB83 /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		DB6FE5B32D9D12500046DB83 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		DB6FE5B52D9D12500046DB83 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB6FE5AC2D9D12500046DB83 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9DAF6F8B2D8AE03B004A9F84 /* Project object */;
 }

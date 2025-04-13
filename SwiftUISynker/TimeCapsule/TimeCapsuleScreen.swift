@@ -1,9 +1,12 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct TimeCapsuleScreen: View {
     @State private var timeCapsules: [TimeCapsule] = []
     @State private var subtasks: [UUID: [Subtask]] = [:]
     @State private var selectedFilter: TaskFilter = .allCapsules
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String? = nil
     let taskModel = TaskDataModel.shared
     @State var loggedUser: User?
     
@@ -15,56 +18,71 @@ struct TimeCapsuleScreen: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    // Display top Capsule with the nearest deadline (only for active tasks)
-                    if let topCapsule = getActiveCapsules().min(by: { $0.deadline < $1.deadline }) {
-                        NavigationLink(destination: TimeCapsuleDetailView(capsule: topCapsule, loggedUser: loggedUser, subtasks: subtasks[topCapsule.id] ?? [])) {
-                            TopCapsuleItemView(capsule: topCapsule)
+            ZStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        // Display top Capsule with the nearest deadline (only for active tasks)
+                        if let topCapsule = getActiveCapsules().min(by: { $0.deadline < $1.deadline }) {
+                            NavigationLink(destination: TimeCapsuleDetailView(capsule: topCapsule, loggedUser: loggedUser)) {
+                                TopCapsuleItemView(capsule: topCapsule)
+                                    .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
+                        Text("My Capsules")
+                            .font(.title2).bold()
+                            .padding(.horizontal)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // Segmented picker for filtering
+                        Picker("Task Filter", selection: $selectedFilter) {
+                            Text("All Capsules").tag(TaskFilter.allCapsules)
+                            Text("Active").tag(TaskFilter.active)
+                            Text("Completed").tag(TaskFilter.completed)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal)
+                        
+                        // Error message if there's any
+                        if let errorMessage = errorMessage {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
                                 .padding(.horizontal)
                         }
-                        .buttonStyle(PlainButtonStyle()) // Removes default button styling
-//                        Text("Hurry up! Time's ticking!")
-//                            .font(.subheadline)
-//                            .padding(.horizontal)
-//                            .foregroundColor(.red)
-//                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-
-                    Text("My Capsules")
-                        .font(.title2).bold()
-                        .padding(.horizontal)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    // Segmented picker for filtering
-                    Picker("Task Filter", selection: $selectedFilter) {
-                        Text("All Capsules").tag(TaskFilter.allCapsules)
-                        Text("Active").tag(TaskFilter.active)
-                        Text("Completed").tag(TaskFilter.completed)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding(.horizontal)
-                    
-                    // Filtered Capsules List
-                    let filteredCapsules = getFilteredCapsules()
-                    if !filteredCapsules.isEmpty {
-                        LazyVStack(spacing: 10) {
-                            ForEach(filteredCapsules, id: \.id) { capsule in
-                                NavigationLink(destination: TimeCapsuleDetailView(capsule: capsule, loggedUser: loggedUser, subtasks: subtasks[capsule.id] ?? [])) {
-                                    CapsuleItemView(capsule: capsule)
-                                        .padding(.horizontal)
+                        
+                        // Filtered Capsules List
+                        let filteredCapsules = getFilteredCapsules()
+                        if !filteredCapsules.isEmpty {
+                            LazyVStack(spacing: 10) {
+                                ForEach(filteredCapsules, id: \.id) { capsule in
+                                    NavigationLink(destination: TimeCapsuleDetailView(capsule: capsule, loggedUser: loggedUser)) {
+                                        CapsuleItemView(capsule: capsule)
+                                            .padding(.horizontal)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
+                            }
+                        } else {
+                            if !isLoading {
+                                Text("No capsules found")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.top, 20)
                             }
                         }
-                    } else {
-                        Text("No capsules found")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 20)
                     }
+                    .padding(.vertical)
                 }
-                .padding(.vertical)
+                
+                // Loading indicator
+                if isLoading {
+                    ProgressView("Loading capsules...")
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .padding()
+                        .background(Color.white.opacity(0.8))
+                        .cornerRadius(10)
+                }
             }
             .navigationTitle("Time Capsule")
             .onAppear {
@@ -73,20 +91,208 @@ struct TimeCapsuleScreen: View {
         }
     }
     
-    // Fetch time capsules from TaskDataModel
+    // New fetchTimeCapsules function that uses Firebase
     private func fetchTimeCapsules() {
-        let taskModel = TaskDataModel.shared
-        if let user = loggedUser {
-            timeCapsules = taskModel.getAllTimeCapsules(for: user.userId)
-            let currentUser = taskModel.getUser(by: user.userId)
-            if let currentUser = currentUser {
-                for capsuleId in currentUser.timeCapsuleIds {
-                    subtasks[capsuleId] = taskModel.getSubtasks(for: capsuleId)
+        guard let user = loggedUser, !user.email.isEmpty else {
+            errorMessage = "No logged in user or invalid email"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        // Get all time capsules for the user's email
+        getAllTimeCapsules(forEmail: user.email) { fetchedCapsules in
+            // Now fetch all subtasks for each capsule
+            let group = DispatchGroup()
+            var allSubtasks: [UUID: [Subtask]] = [:]
+            
+            for capsule in fetchedCapsules {
+                group.enter()
+                fetchSubtasks(forCapsuleId: capsule.id) { fetchedSubtasks in
+                    allSubtasks[capsule.id] = fetchedSubtasks
+                    
+                    // Update completion percentage based on fetched subtasks
+                    if let index = fetchedCapsules.firstIndex(where: { $0.id == capsule.id }) {
+                        var updatedCapsule = fetchedCapsules[index]
+                        updatedCapsule.updateCompletionPercentage(subtasks: fetchedSubtasks)
+                        DispatchQueue.main.async {
+                            if let updateIndex = self.timeCapsules.firstIndex(where: { $0.id == capsule.id }) {
+                                self.timeCapsules[updateIndex] = updatedCapsule
+                            }
+                        }
+                    }
+                    
+                    group.leave()
                 }
             }
+            
+            group.notify(queue: .main) {
+                self.timeCapsules = fetchedCapsules
+                self.subtasks = allSubtasks
+                self.isLoading = false
+            }
         }
-//        guard let x = loggedUser else { return }
-//        loggedUser = taskModel.getUser(by: x.userId)
+    }
+    
+    // Function to fetch all time capsules for a specific email
+    private func getAllTimeCapsules(forEmail email: String, completion: @escaping ([TimeCapsule]) -> Void) {
+        let db = Firestore.firestore()
+        
+        // Step 1: Fetch the user by email
+        db.collection("users")
+            .whereField("email", isEqualTo: email)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching user: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Failed to fetch user data: \(error.localizedDescription)"
+                        self.isLoading = false
+                    }
+                    completion([])
+                    return
+                }
+
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No user found with email: \(email)")
+                    DispatchQueue.main.async {
+                        self.errorMessage = "No user found with this email"
+                        self.isLoading = false
+                    }
+                    completion([])
+                    return
+                }
+
+                let data = document.data()
+                
+                // Step 2: Extract time capsule IDs
+                guard let timeCapsuleIdStrings = data["timeCapsuleIds"] as? [String], !timeCapsuleIdStrings.isEmpty else {
+                    print("⚠️ No time capsule IDs found for user.")
+                    DispatchQueue.main.async {
+                        self.errorMessage = nil // No error, just no capsules
+                        self.isLoading = false
+                    }
+                    completion([])
+                    return
+                }
+
+                // Step 3: Query timeCapsules collection for matching IDs
+                db.collection("timeCapsules")
+                    .whereField("id", in: timeCapsuleIdStrings)
+                    .getDocuments(source: .default) { (capsuleSnapshot, error) in
+                        if let error = error {
+                            print("❌ Error fetching time capsules: \(error.localizedDescription)")
+                            DispatchQueue.main.async {
+                                self.errorMessage = "Failed to fetch time capsules: \(error.localizedDescription)"
+                                self.isLoading = false
+                            }
+                            completion([])
+                            return
+                        }
+
+                        guard let capsuleDocs = capsuleSnapshot?.documents else {
+                            print("⚠️ No matching time capsules found.")
+                            DispatchQueue.main.async {
+                                self.errorMessage = nil // No error, just no capsules
+                                self.isLoading = false
+                            }
+                            completion([])
+                            return
+                        }
+
+                        var fetchedCapsules: [TimeCapsule] = []
+
+                        for doc in capsuleDocs {
+                            let data = doc.data()
+
+                            guard
+                                let name = data["capsuleName"] as? String,
+                                let deadlineTimestamp = data["deadline"] as? Timestamp,
+                                let priorityRaw = data["priority"] as? String,
+                                let desc = data["description"] as? String,
+                                let perc=data["completionPercentage"] as? Double,
+                                let categoryRaw = data["category"] as? String,
+                                let subtaskIdStrings = data["subtaskIds"] as? [String],
+                                let capsuleIdString = data["id"] as? String,
+                                let capsuleId = UUID(uuidString: capsuleIdString),
+                                let priority = Priority(rawValue: priorityRaw),
+                                let category = Category(rawValue: categoryRaw)
+                            else {
+                                print("⚠️ Skipping invalid capsule data in document: \(doc.documentID)")
+                                continue
+                            }
+
+                            let subtaskUUIDs = subtaskIdStrings.compactMap { UUID(uuidString: $0) }
+
+                            var capsule = TimeCapsule(
+                                
+                                capsuleName: name,
+                                deadline: deadlineTimestamp.dateValue(),
+                                priority: priority,
+                                description: desc,
+                                category: category
+                               
+                            )
+                            
+                            capsule.id=capsuleId
+                            capsule.completionPercentage=perc
+                            capsule.subtaskIds=subtaskUUIDs
+                            
+                            fetchedCapsules.append(capsule)
+                        }
+
+                        completion(fetchedCapsules)
+                    }
+            }
+    }
+    
+    // Function to fetch subtasks for a specific capsule
+    private func fetchSubtasks(forCapsuleId capsuleId: UUID, completion: @escaping ([Subtask]) -> Void) {
+        let db = Firestore.firestore()
+        
+        db.collection("subtasks")
+            .whereField("capsuleId", isEqualTo: capsuleId.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching subtasks: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                guard let documents = snapshot?.documents else {
+                    print("⚠️ No subtasks found for capsule ID: \(capsuleId)")
+                    completion([])
+                    return
+                }
+                
+                var subtasks: [Subtask] = []
+                
+                for doc in documents {
+                    let data = doc.data()
+                    
+                    guard
+                        let subtaskIdString = data["id"] as? String,
+                        let subtaskId = UUID(uuidString: subtaskIdString),
+                        let name = data["subtaskName"] as? String,
+                        let description = data["description"] as? String,
+                        let isCompleted = data["isCompleted"] as? Bool
+                    else {
+                        print("⚠️ Skipping invalid subtask data in document: \(doc.documentID)")
+                        continue
+                    }
+                    
+                    let subtask = Subtask(
+                        subtaskId: subtaskId,
+                        subtaskName: name,
+                        description: description,
+                        isCompleted: isCompleted
+                    )
+                    
+                    subtasks.append(subtask)
+                }
+                
+                completion(subtasks)
+            }
     }
     
     // Get active capsules (not 100% completed)

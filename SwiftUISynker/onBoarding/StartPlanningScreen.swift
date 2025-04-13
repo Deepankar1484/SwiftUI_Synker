@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct StartPlanningScreen: View {
+    let userId: String // Accept userId as a parameter
+
     var body: some View {
         NavigationView {
             VStack {
@@ -26,7 +28,7 @@ struct StartPlanningScreen: View {
                 
                 Spacer()
                 
-                NavigationLink(destination: UsageScreen()) {
+                NavigationLink(destination: UsageScreen(userId: userId)) { // Pass userId to next screen
                     Text("Start Planning")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -42,6 +44,7 @@ struct StartPlanningScreen: View {
     }
 }
 
+// 🔥 SwiftUI Preview
 #Preview {
-    StartPlanningScreen()
+    StartPlanningScreen(userId: "sampleUserId123") // Example User ID for preview
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import FirebaseFirestore
 
 struct HomeView: View {
     @State private var selectedSegment: TaskViewType = .all
@@ -7,43 +8,133 @@ struct HomeView: View {
     @State var loggedUser: User?
     @State private var expandedCategories: Set<Category> = []
     @State private var expandedPriorities: Set<Priority> = []
+    @State private var isLoading: Bool = false
     let taskModel = TaskDataModel.shared
     
-    @State var tasks: [UserTask] = [
-//        UserTask(taskName: "Go Gym and do some exercises", description: "Workout session", startTime: "5:00PM", endTime: "6:30AM", date: Date(), priority: .high, alert: .oneHour, category: .sports, isCompleted: true),
-//        UserTask(taskName: "I want to study OOPs in C++", description: "Study Session", startTime: "6:00PM", endTime: "7:30PM", date: Date(), priority: .medium, alert: .oneHour, category: .study),
-        UserTask(taskName: "Attend a meeting", description: "Work discussion", startTime: "10:00AM", endTime: "11:30AM", date: Date(), priority: .high, alert: .oneHour, category: .work)
-    ]
+    // Start with empty task array
+    @State var tasks: [UserTask] = []
+    
+    // Firebase reference
+    private let db = Firestore.firestore()
     
     var body: some View {
         ScrollView (showsIndicators: false){
             // Header Section
-            headerView
+            headerView()
             // Weekly Dates Picker
             weekView
-            // Task List
-            taskList
+            
+            if isLoading {
+                ProgressView("Loading tasks...")
+                    .padding()
+            } else {
+                // Task List
+                taskList
+            }
+            
             Spacer()
         }
         .padding()
         .onAppear {
-            guard let x = loggedUser else { return }
-            tasks = taskModel.getAllTasks(for: x.userId)
-            loggedUser = taskModel.getUser(by: x.userId)
-            taskModel.updateStreak(for: x.userId)
-            if let x = loggedUser {
-                if let y = taskModel.getUser(by: x.userId) {
-                    print(y)
-                }
-            }
+            fetchUserTasks()
+            print("🟣 Logged user in HomeView onAppear: \(String(describing: loggedUser))")
         }
     }
+    
+    // MARK: - Firebase Functions
+    private func fetchUserTasks() {
+        guard let user = loggedUser, !user.email.isEmpty else {
+            print("❌ No logged user or email is empty")
+            return
+        }
+        
+        isLoading = true
+        
+        // Reference to tasks collection
+        let tasksRef = db.collection("tasks")
+        
+        // Query tasks with matching userEmail
+        tasksRef.whereField("userEmail", isEqualTo: user.email)
+            .getDocuments { (querySnapshot, error) in
+                isLoading = false
+                
+                if let error = error {
+                    print("❌ Error getting documents: \(error)")
+                    return
+                }
+                
+                guard let documents = querySnapshot?.documents else {
+                    print("No documents found")
+                    return
+                }
+                
+                // Parse documents to UserTask objects
+                var fetchedTasks: [UserTask] = []
+                
+                for document in documents {
+                    let data = document.data()
+                    
+                    // Extract data from Firebase document
+                    if let taskName = data["taskName"] as? String,
+                       let description = data["description"] as? String,
+                       let startTime = data["startTime"] as? String,
+                       let endTime = data["endTime"] as? String,
+                       let timestamp = data["date"] as? Timestamp,
+                       let priorityString = data["priority"] as? String,
+                       let alertString = data["alert"] as? String,
+                       let categoryString = data["category"] as? String,
+                       let isCompleted = data["isCompleted"] as? Bool {
+                        
+                        // Convert string values to enums
+                        guard let priority = Priority(rawValue: priorityString),
+                              let alert = Alert(rawValue: alertString),
+                              let category = Category(rawValue: categoryString) else {
+                            print("⚠️ Invalid enum value(s) for task: \(taskName)")
+                            continue
+                        }
+                        
+                        // Convert Firestore timestamp to Date
+                        let date = timestamp.dateValue()
+                        
+                        // Create UserTask object
+                        let task = UserTask(
+                            taskName: taskName,
+                            description: description,
+                            startTime: startTime,
+                            endTime: endTime,
+                            date: date,
+                            priority: priority,
+                            alert: alert,
+                            category: category,
+                            otherCategory: data["otherCategory"] as? String,
+                            isCompleted: isCompleted
+                        )
+                        
+                        // If Firebase document has an ID field, you could assign it to task.id
+                        if let idString = data["id"] as? String, let id = UUID(uuidString: idString) {
+                            // Create a new task with the ID from Firebase
+                            var updatedTask = task
+                            updatedTask.id = id
+                            fetchedTasks.append(updatedTask)
+                        } else {
+                            fetchedTasks.append(task)
+                        }
+                    }
+                }
+                
+                // Update tasks array with fetched data
+                self.tasks = fetchedTasks
+                print("📊 Fetched \(fetchedTasks.count) tasks for user: \(user.email)")
+            }
+    }
+    
     // MARK: - Header View
-    private var headerView: some View {
+    @ViewBuilder
+    private func headerView() -> some View {
         ZStack {
             HStack {
                 VStack(alignment: .leading) {
-                    Text("Welcome, \(loggedUser?.name ?? "User")")
+                    Text("Hello, \(loggedUser?.name ?? "User")!")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Text(selectedDate.fullFormattedString())
@@ -55,7 +146,11 @@ struct HomeView: View {
             .padding(5)
         }
         .padding(.horizontal)
+        .onAppear {
+            print("📡 HeaderView loaded with user: \(loggedUser?.name ?? "nil")")
+        }
     }
+
     
     private var progressPercentage: Int {
         let todayTasks = tasks.filter { $0.date.isSameDay(as: selectedDate) } // Filter today's tasks
@@ -95,17 +190,12 @@ struct HomeView: View {
                 .padding(.top, 20)
             }
             .onAppear {
-//                DispatchQueue.main.asyncAfter(deadline: .now()) { // Add a slight delay
-                    if let firstDate = Date().fullWeekDates().first(where: { $0.isSameDay(as: selectedDate) }) {
-                        withAnimation{
-                            proxy.scrollTo(firstDate, anchor: .center)
-                        }
+                if let firstDate = Date().fullWeekDates().first(where: { $0.isSameDay(as: selectedDate) }) {
+                    withAnimation{
+                        proxy.scrollTo(firstDate, anchor: .center)
                     }
-//                }
-                
-                
+                }
             }
-
         }
     }
 
@@ -348,7 +438,12 @@ struct HomeView: View {
     private var overdueTasksView: some View {
         VStack {
             if let user = loggedUser {
-                let overdueTasks = taskModel.fetchOverdueTasks(for: user.userId)
+                // For overdue tasks, we'll use the tasks we fetched from Firebase
+                let now = Date()
+                let overdueTasks = tasks.filter { task in
+                    // A task is overdue if its date is before today AND it's not completed
+                    !task.isCompleted && Calendar.current.startOfDay(for: task.date) < Calendar.current.startOfDay(for: now)
+                }
                 
                 if overdueTasks.isEmpty {
                     Text("No overdue tasks 🎉")
@@ -376,7 +471,6 @@ struct HomeView: View {
 enum TaskViewType {
     case all, category, priority, overdue
 }
-
 
 // MARK: - Preview
 #Preview {

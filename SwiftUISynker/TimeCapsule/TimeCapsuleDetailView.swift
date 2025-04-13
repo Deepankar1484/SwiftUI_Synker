@@ -1,13 +1,17 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct TimeCapsuleDetailView: View {
     var capsule: TimeCapsule
     var loggedUser: User?
-    var subtasks: [Subtask]
+    @State private var subtasks: [Subtask] = []
     @State private var showingCompletionAlert = false
     @State private var showDeleteConfirmation = false
     @State private var selectedSubtaskId: UUID?
     @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
+    @State private var updatedCompletionPercentage: Double = 0.0
     
     var body: some View {
         ScrollView {
@@ -22,7 +26,7 @@ struct TimeCapsuleDetailView: View {
                         
                         // Linear progress bar
                         VStack(alignment: .leading, spacing: 4) {
-                            // Progress      40%
+                            // Progress percentage
                             HStack {
                                 Text("Progress")
                                     .font(.subheadline)
@@ -30,12 +34,12 @@ struct TimeCapsuleDetailView: View {
                                 
                                 Spacer()
                                 
-                                Text("\(Int(capsule.completionPercentage))%")
+                                Text("\(Int(isLoading ? capsule.completionPercentage : updatedCompletionPercentage))%")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                             }
                             
-                            // the line part
+                            // The progress bar
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
                                     // Background
@@ -45,8 +49,8 @@ struct TimeCapsuleDetailView: View {
                                     
                                     // Progress
                                     RoundedRectangle(cornerRadius: 10)
-                                        .fill(progressColor(percentage: capsule.completionPercentage))
-                                        .frame(width: max(geometry.size.width * CGFloat(capsule.completionPercentage) / 100, 0), height: 10)
+                                        .fill(progressColor(percentage: isLoading ? capsule.completionPercentage : updatedCompletionPercentage))
+                                        .frame(width: max(geometry.size.width * CGFloat(isLoading ? capsule.completionPercentage : updatedCompletionPercentage) / 100, 0), height: 10)
                                 }
                             }
                             .frame(height: 10)
@@ -125,7 +129,18 @@ struct TimeCapsuleDetailView: View {
                     }
                     .padding(.horizontal)
                     
-                    if subtasks.isEmpty {
+                    if isLoading {
+                        VStack {
+                            ProgressView("Loading subtasks...")
+                                .padding()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    } else if let error = errorMessage {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .padding()
+                    } else if subtasks.isEmpty {
                         EmptySubtasksView()
                     } else {
                         VStack(spacing: 12) {
@@ -139,11 +154,7 @@ struct TimeCapsuleDetailView: View {
                                         }
                                     },
                                     onDelete: {
-                                        let taskModel = TaskDataModel.shared
-                                        let check = taskModel.deleteSubtask(with: subtask.subtaskId, from: capsule.id)
-                                        if check {
-                                            dismiss()
-                                        }
+                                        deleteSubtask(subtask)
                                     }
                                 )
                             }
@@ -151,7 +162,7 @@ struct TimeCapsuleDetailView: View {
                         .padding(.horizontal)
                     }
                     
-                    if capsule.completionPercentage < 100 {
+                    if !isLoading && (updatedCompletionPercentage < 100 || capsule.completionPercentage < 100) {
                         Button(action: {
                             showDeleteConfirmation = true
                         }) {
@@ -173,17 +184,14 @@ struct TimeCapsuleDetailView: View {
         .navigationTitle("Capsule Details")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .onAppear {
+            fetchSubtasksFromFirebase()
+        }
         .alert("Mark as Complete", isPresented: $showingCompletionAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Mark Complete") {
                 if let subtaskId = selectedSubtaskId {
-                    let taskModel = TaskDataModel.shared
-                    let success = taskModel.markSubtaskComplete(subtaskId: subtaskId, capsuleId: capsule.id)
-                    
-                    if success {
-                        // If all subtasks are now completed, dismiss the view
-                        dismiss()
-                    }
+                    markSubtaskComplete(subtaskId: subtaskId)
                 }
             }
         } message: {
@@ -192,13 +200,7 @@ struct TimeCapsuleDetailView: View {
         .alert("Delete Task", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                let taskModel = TaskDataModel.shared
-                if let user = loggedUser {
-                    let checkDeleteCapsule = taskModel.deleteTimeCapsule(with: capsule.id, for: user.userId)
-                    if checkDeleteCapsule {
-                        dismiss()
-                    }
-                }
+                deleteTimeCapsule()
             }
         } message: {
             Text("Are you sure you want to delete this task? This action cannot be undone.")
@@ -215,7 +217,328 @@ struct TimeCapsuleDetailView: View {
             return .green
         }
     }
+    
+    // MARK: - Firebase Functions
+    
+    private func fetchSubtasksFromFirebase() {
+        isLoading = true
+        errorMessage = nil
+        
+        let db = Firestore.firestore()
+        let subtaskIds = capsule.subtaskIds.map { $0.uuidString }
+        
+        if subtaskIds.isEmpty {
+            isLoading = false
+            updateCompletionPercentage()
+            return
+        }
+        
+        db.collection("subtasks")
+            .whereField("id", in: subtaskIds)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching subtasks: \(error.localizedDescription)")
+                    errorMessage = "Failed to load subtasks: \(error.localizedDescription)"
+                    isLoading = false
+                    return
+                }
+                
+                guard let documents = snapshot?.documents else {
+                    isLoading = false
+                    return
+                }
+                
+                var fetchedSubtasks: [Subtask] = []
+                
+                for doc in documents {
+                    let data = doc.data()
+                    
+                    guard
+                        let subtaskIdString = data["id"] as? String,
+                        let subtaskId = UUID(uuidString: subtaskIdString),
+                        let name = data["subtaskName"] as? String,
+                        let description = data["description"] as? String,
+                        let isCompleted = data["isCompleted"] as? Bool
+                    else {
+                        continue
+                    }
+                    
+                    let subtask = Subtask(
+                        subtaskId: subtaskId,
+                        subtaskName: name,
+                        description: description,
+                        isCompleted: isCompleted
+                    )
+                    
+                    fetchedSubtasks.append(subtask)
+                }
+                
+                self.subtasks = fetchedSubtasks
+                updateCompletionPercentage()
+                isLoading = false
+            }
+    }
+    
+    private func updateCompletionPercentage() {
+        if subtasks.isEmpty {
+            updatedCompletionPercentage = 0.0
+        } else {
+            let completedCount = subtasks.filter { $0.isCompleted }.count
+            updatedCompletionPercentage = Double(completedCount) / Double(subtasks.count) * 100.0
+        }
+        
+        // Update the percentage in Firebase
+        updateCapsuleCompletionPercentage()
+    }
+    
+    private func updateCapsuleCompletionPercentage() {
+        let db = Firestore.firestore()
+        
+        db.collection("timeCapsules")
+            .whereField("id", isEqualTo: capsule.id.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching time capsule: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No time capsule found with id: \(capsule.id)")
+                    return
+                }
+                
+                // Update the completion percentage
+                document.reference.updateData([
+                    "completionPercentage": updatedCompletionPercentage
+                ]) { error in
+                    if let error = error {
+                        print("❌ Error updating completion percentage: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Time capsule completion percentage updated successfully")
+                    }
+                }
+            }
+    }
+    
+    private func markSubtaskComplete(subtaskId: UUID) {
+        let db = Firestore.firestore()
+        
+        db.collection("subtasks")
+            .whereField("id", isEqualTo: subtaskId.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching subtask: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No subtask found with id: \(subtaskId)")
+                    return
+                }
+                
+                // Mark the subtask as completed
+                document.reference.updateData([
+                    "isCompleted": true
+                ]) { error in
+                    if let error = error {
+                        print("❌ Error marking subtask as complete: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Subtask marked as complete successfully")
+                        
+                        // Update local state
+                        if let index = subtasks.firstIndex(where: { $0.subtaskId == subtaskId }) {
+                            subtasks[index].isCompleted = true
+                        }
+                        
+                        // Recalculate completion percentage
+                        updateCompletionPercentage()
+                        
+                        // If all subtasks are completed, dismiss the view
+                        if subtasks.allSatisfy({ $0.isCompleted }) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+            }
+    }
+    
+    private func deleteSubtask(_ subtask: Subtask) {
+        let db = Firestore.firestore()
+        
+        // 1. Delete the subtask document
+        db.collection("subtasks")
+            .whereField("id", isEqualTo: subtask.subtaskId.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching subtask: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No subtask found with id: \(subtask.subtaskId)")
+                    return
+                }
+                
+                document.reference.delete { error in
+                    if let error = error {
+                        print("❌ Error deleting subtask: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Subtask deleted successfully")
+                        
+                        // 2. Update time capsule subtaskIds array
+                        removeSubtaskIdFromTimeCapsule(subtaskId: subtask.subtaskId)
+                        
+                        // 3. Update local state
+                        subtasks.removeAll { $0.subtaskId == subtask.subtaskId }
+                        
+                        // 4. Recalculate completion percentage
+                        updateCompletionPercentage()
+                    }
+                }
+            }
+    }
+    
+    private func removeSubtaskIdFromTimeCapsule(subtaskId: UUID) {
+        let db = Firestore.firestore()
+        
+        db.collection("timeCapsules")
+            .whereField("id", isEqualTo: capsule.id.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching time capsule: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No time capsule found with id: \(capsule.id)")
+                    return
+                }
+                
+                // Get current subtaskIds
+                guard let subtaskIdStrings = document.data()["subtaskIds"] as? [String] else {
+                    print("⚠️ No subtaskIds found in time capsule")
+                    return
+                }
+                
+                // Remove the subtaskId
+                let updatedSubtaskIds = subtaskIdStrings.filter { $0 != subtaskId.uuidString }
+                
+                // Update the document
+                document.reference.updateData([
+                    "subtaskIds": updatedSubtaskIds
+                ]) { error in
+                    if let error = error {
+                        print("❌ Error updating subtaskIds: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Removed subtaskId from time capsule successfully")
+                    }
+                }
+            }
+    }
+    
+    private func deleteTimeCapsule() {
+        guard let loggedUser = loggedUser else {
+            print("❌ No logged user found")
+            return
+        }
+        
+        let db = Firestore.firestore()
+        
+        // 1. Delete all subtasks first
+        for subtask in subtasks {
+            db.collection("subtasks")
+                .whereField("id", isEqualTo: subtask.subtaskId.uuidString)
+                .getDocuments(source: .default) { (snapshot, error) in
+                    if let error = error {
+                        print("❌ Error fetching subtask: \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    guard let document = snapshot?.documents.first else { return }
+                    
+                    document.reference.delete { error in
+                        if let error = error {
+                            print("❌ Error deleting subtask: \(error.localizedDescription)")
+                        }
+                    }
+                }
+        }
+        
+        // 2. Delete the time capsule
+        db.collection("timeCapsules")
+            .whereField("id", isEqualTo: capsule.id.uuidString)
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching time capsule: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No time capsule found with id: \(capsule.id)")
+                    return
+                }
+                
+                document.reference.delete { error in
+                    if let error = error {
+                        print("❌ Error deleting time capsule: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Time capsule deleted successfully")
+                        
+                        // 3. Remove time capsule ID from user
+                        removeTimeCapsuleIdFromUser()
+                    }
+                }
+            }
+    }
+    
+    private func removeTimeCapsuleIdFromUser() {
+        let db = Firestore.firestore()
+        
+        db.collection("users")
+            .whereField("email", isEqualTo: loggedUser?.email ?? "")
+            .getDocuments(source: .default) { (snapshot, error) in
+                if let error = error {
+                    print("❌ Error fetching user: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    print("⚠️ No user found with email: \(loggedUser?.email ?? "")")
+                    return
+                }
+                
+                // Get current timeCapsuleIds
+                guard let timeCapsuleIdStrings = document.data()["timeCapsuleIds"] as? [String] else {
+                    print("⚠️ No timeCapsuleIds found for user")
+                    return
+                }
+                
+                // Remove the time capsule ID
+                let updatedTimeCapsuleIds = timeCapsuleIdStrings.filter { $0 != capsule.id.uuidString }
+                
+                // Update the document
+                document.reference.updateData([
+                    "timeCapsuleIds": updatedTimeCapsuleIds
+                ]) { error in
+                    if let error = error {
+                        print("❌ Error updating user timeCapsuleIds: \(error.localizedDescription)")
+                    } else {
+                        print("✅ Removed time capsule ID from user successfully")
+                        
+                        // Dismiss the view
+                        DispatchQueue.main.async {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+    }
 }
+
+// MARK: - Supporting Views
+// Keep the existing supporting view structures (MetadataItemView, EmptySubtasksView, SubtaskCardView) as they were
 
 // Reusable Metadata Item component
 struct MetadataItemView: View {
@@ -236,7 +559,7 @@ struct MetadataItemView: View {
                     Image(iconName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 15, height: 15) // Bigger icon
+                        .frame(width: 15, height: 15)
                         .foregroundColor(.white)
                 } else {
                     Image(systemName: iconName)
@@ -283,7 +606,7 @@ struct EmptySubtasksView: View {
 struct SubtaskCardView: View {
     var subtask: Subtask
     var onTap: () -> Void
-    var onDelete: () -> Void // Closure for delete action
+    var onDelete: () -> Void
 
     @State private var showDeleteAlert = false
 
@@ -357,27 +680,3 @@ private let dateFormatter: DateFormatter = {
 }()
 
 // MARK: - Preview
-#Preview {
-    let sampleCapsule = TimeCapsule(
-        capsuleName: "Develop iOS App",
-        deadline: Date().addingTimeInterval(86400 * 5), // 5 days from now
-        priority: .high,
-        description: "Create a productivity app for iOS using SwiftUI with time capsule functionality and task tracking. This will help users organize their tasks and improve productivity.",
-        category: .work
-    )
-    
-    let sampleSubtasks = [
-        Subtask(subtaskName: "Research UI Components", description: "Look for SwiftUI components that can be used for the app. Focus on modern, clean design that's easy to use.", isCompleted: true),
-        Subtask(subtaskName: "Create Data Models", description: "Define the data structures needed for the app, including TimeCapsule and Subtask models.", isCompleted: true),
-        Subtask(subtaskName: "Implement Core Logic", description: "Write the business logic for the app, including calculations for completion percentages.", isCompleted: false),
-        Subtask(subtaskName: "Create UI Screens", description: "Design and implement the main UI screens, including list views and detail views.", isCompleted: false),
-        Subtask(subtaskName: "Add Persistence", description: "Implement data persistence using CoreData to save user data.", isCompleted: false)
-    ]
-    
-    var updatedCapsule = sampleCapsule
-    updatedCapsule.updateCompletionPercentage(subtasks: sampleSubtasks)
-    
-    return NavigationStack {
-        TimeCapsuleDetailView(capsule: updatedCapsule, subtasks: sampleSubtasks)
-    }
-}

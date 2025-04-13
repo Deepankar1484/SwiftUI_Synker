@@ -1,4 +1,7 @@
 import UIKit
+import Firebase
+import FirebaseFirestore
+
 import Foundation
 
 extension Date {
@@ -84,6 +87,91 @@ func getAprilDate(day: Int) -> Date {
 }
 
 // MARK: - Enums
+
+// MARK: - Models
+struct User {
+    var userId: UUID = UUID()
+    var name: String
+    var email: String
+    var password: String
+    var phone: String?
+    var taskIds: [UUID] = []
+    var timeCapsuleIds: [UUID] = []
+    var totalStreak: Int = 0
+    var maxStreak: Int = 0
+    var settings: Settings?
+    var awardsEarned: [AwardsEarned] = []
+    var lastDateModified: Date = Date()
+    
+    init(name: String, email: String, password: String) {
+        self.name = name
+        self.email = email
+        self.password = password
+    }
+}
+
+struct AwardsEarned: Identifiable{
+    var id: UUID
+    var awardName: String
+    var description: String
+    var awardImage: String
+    var dateEarned: Date
+    
+    
+    init(id: UUID = UUID(), awardName: String,description: String,awardImage: String, dateEarned: Date) {
+        self.id = id
+        self.awardName = awardName
+        self.dateEarned = dateEarned
+        self.description = description
+        self.awardImage = awardImage
+    }
+}
+
+struct Settings {
+    var profilePicture: String?
+    var usage: Usage
+    var bedtime: String
+    var wakeUpTime: String
+    var notificationsEnabled: Bool
+}
+
+
+enum Usage: String,CaseIterable {
+    case personal = "Personal"
+    case work = "Work"
+    case education = "Education"
+}
+
+struct UserTask: Identifiable {
+    var id = UUID()
+    var taskName: String
+    var description: String
+    var startTime: String
+    var endTime: String
+    var date: Date // Single date for the task
+    var priority: Priority
+    var isCompleted: Bool
+    var alert: Alert
+    var category: Category
+    var otherCategory: String?
+    
+    init(taskName: String, description: String, startTime: String, endTime: String, date: Date, priority: Priority, alert: Alert, category: Category, otherCategory: String? = nil, isCompleted: Bool = false) {
+        self.taskName = taskName
+        self.description = description
+        self.startTime = startTime
+        self.endTime = endTime
+        self.date = date
+        self.priority = priority
+        self.isCompleted = isCompleted
+        self.alert = alert
+        self.category = category
+        self.otherCategory = otherCategory
+    }
+    mutating func markAsCompleted() {
+        self.isCompleted = true
+    }
+}
+
 enum Priority: String,CaseIterable {
     case low = "Low"
     case medium = "Medium"
@@ -115,11 +203,7 @@ enum Alert: String,CaseIterable {
     case oneHour = "1 hour"
 }
 
-enum Usage: String,CaseIterable {
-    case personal = "Personal"
-    case work = "Work"
-    case education = "Education"
-}
+
 
 enum Category: String, CaseIterable {
     case sports = "Sports"
@@ -253,74 +337,6 @@ struct CustomCategory {
     var insights: String
 }
 
-// MARK: - Models
-struct User {
-    var userId: UUID
-    var name: String
-    var email: String
-    var password: String
-    var phone: String
-    var taskIds: [UUID] // Store task IDs instead of full tasks
-    var timeCapsuleIds: [UUID] // Store time capsule IDs
-    var totalStreak: Int
-    var maxStreak: Int
-    var settings: Settings
-    var awardsEarned: [AwardsEarned] // Store award IDs instead of full awards
-    var lastDateModified: Date // Track last date streak was updated
-    
-    init(userId: UUID = UUID(), name: String, email: String, password: String, phone: String, totalStreak: Int = 0, maxStreak: Int = 0, settings: Settings, lastDateModified: Date = Date()) {
-        self.userId = userId
-        self.name = name
-        self.email = email
-        self.password = password
-        self.phone = phone
-        self.taskIds = []
-        self.timeCapsuleIds = []
-        self.totalStreak = totalStreak
-        self.maxStreak = maxStreak
-        self.settings = settings
-        self.awardsEarned = []
-        self.lastDateModified = lastDateModified
-    }
-}
-
-struct Settings {
-    var profilePicture: String?
-    var usage: Usage
-    var bedtime: String
-    var wakeUpTime: String
-    var notificationsEnabled: Bool
-}
-
-struct UserTask: Identifiable {
-    var id = UUID()
-    var taskName: String
-    var description: String
-    var startTime: String
-    var endTime: String
-    var date: Date // Single date for the task
-    var priority: Priority
-    var isCompleted: Bool
-    var alert: Alert
-    var category: Category
-    var otherCategory: String?
-    
-    init(taskName: String, description: String, startTime: String, endTime: String, date: Date, priority: Priority, alert: Alert, category: Category, otherCategory: String? = nil, isCompleted: Bool = false) {
-        self.taskName = taskName
-        self.description = description
-        self.startTime = startTime
-        self.endTime = endTime
-        self.date = date
-        self.priority = priority
-        self.isCompleted = isCompleted
-        self.alert = alert
-        self.category = category
-        self.otherCategory = otherCategory
-    }
-    mutating func markAsCompleted() {
-        self.isCompleted = true
-    }
-}
 
 struct TimeCapsule: Identifiable {
     var id = UUID()
@@ -383,18 +399,6 @@ struct Award { //these are the awards that we have.
     }
 }
 
-struct AwardsEarned: Identifiable{
-    var id: UUID // Added for consistency
-    var awardId: UUID // Renamed from award for consistency
-    var dateEarned: Date
-    
-    
-    init(id: UUID = UUID(), awardId: UUID, dateEarned: Date) {
-        self.id = id
-        self.awardId = awardId
-        self.dateEarned = dateEarned
-    }
-}
 
 class TaskDataModel {
     // Singleton instance
@@ -455,6 +459,7 @@ class TaskDataModel {
             }
         }
     }
+    /*
     
     func updateStreak(for userId: UUID) {
         guard var user = getUser(by: userId) else { return }
@@ -516,7 +521,7 @@ class TaskDataModel {
         user.lastDateModified = today
         updateUser(user)
     }
-
+    */
     func deleteUser(_ userId: UUID) -> Bool {
         if let index = users.firstIndex(where: { $0.userId == userId }) {
 
@@ -647,15 +652,18 @@ class TaskDataModel {
         return getAllTasks(for: userId).filter { $0.date < today && !$0.isCompleted }
     }
     
-    // MARK: - Time Capsule Management
+    
     func getAllTimeCapsules(for userId: UUID) -> [TimeCapsule] {
-        return timeCapsules.filter { capsule in
-            if let user = getUser(by: userId) {
-                return user.timeCapsuleIds.contains(capsule.id)
+            return timeCapsules.filter { capsule in
+                if let user = getUser(by: userId) {
+                    return user.timeCapsuleIds.contains(capsule.id)
+                }
+                return false
             }
-            return false
-        }
     }
+
+
+
     
     func getTimeCapsule(by capsuleId: UUID) -> TimeCapsule? {
         return timeCapsules.first { $0.id == capsuleId }
@@ -710,13 +718,14 @@ class TaskDataModel {
     // MARK: - Subtask Management
     
     func getSubtasks(for capsuleId: UUID) -> [Subtask] {
-        if let capsule = getTimeCapsule(by: capsuleId) {
-            return subtasks.filter { subtask in
-                capsule.subtaskIds.contains(subtask.subtaskId)
+            if let capsule = getTimeCapsule(by: capsuleId) {
+                return subtasks.filter { subtask in
+                    capsule.subtaskIds.contains(subtask.subtaskId)
+                }
             }
-        }
-        return []
+            return []
     }
+    
     
     func getSubtask(by subtaskId: UUID) -> Subtask? {
         return subtasks.first { $0.subtaskId == subtaskId }
@@ -801,8 +810,11 @@ class TaskDataModel {
         
         return true
     }
+     
     
     // MARK: - Award Management
+    
+    /*
     
     func getAllAwards() -> [Award] {
         return awards
@@ -860,7 +872,7 @@ class TaskDataModel {
             _ = awardUser(userId: userId, awardId: newAward.id)
         }
     }
-
+    */
     
     // MARK: - Helper Methods
     
@@ -915,10 +927,8 @@ class TaskDataModel {
         let sampleUser = User(
             name: "John Doe",
             email: "a@gmail.com",
-            password: "123456",
-            phone: "+1234567890",
-            settings: sampleSettings,
-            lastDateModified: getMarch17Date()
+            password: "123456"
+           
         )
         
         users.append(sampleUser)
@@ -1019,6 +1029,9 @@ class TaskDataModel {
         
         addCompletedTasksForMarch(userId: sampleUser.userId)
         
+        
+       
+        
         // Sample time capsule
         let capsule1 = TimeCapsule(
             capsuleName: "Learn Swift",
@@ -1072,7 +1085,8 @@ class TaskDataModel {
         _ = addSubtask(subtask8, to: capsule3.id)
         _ = addSubtask(subtask9, to: capsule3.id)
         
+        
         // Award the user
-        _ = awardUser(userId: sampleUser.userId, awardId: award1.id)
+        
     }
 }

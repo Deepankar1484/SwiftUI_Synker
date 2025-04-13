@@ -1,4 +1,6 @@
 import SwiftUI
+import FirebaseAuth
+import FirebaseFirestore
 
 struct AuthenticationView: View {
     @AppStorage("isLoggedIn") private var isLoggedIn = false
@@ -7,12 +9,12 @@ struct AuthenticationView: View {
 
     var body: some View {
         if isLoggedIn, let user = loggedUser {
-            CustomTabBar(loggedUser: user) // Navigate to Main App after login
+            CustomTabBar(loggedUser: user) // Navigate to main app screen
         } else {
             if showLogin {
                 LoginView(toggleView: { showLogin = false }, onLoginSuccess: { user in
                     loggedUser = user
-                    isLoggedIn = true // Set logged in state
+                    isLoggedIn = true
                 })
             } else {
                 SignupView(toggleView: { showLogin = true })
@@ -23,101 +25,162 @@ struct AuthenticationView: View {
 
 struct LoginView: View {
     var toggleView: () -> Void
-    var onLoginSuccess: (User) -> Void  // Callback for successful login
+    var onLoginSuccess: (User) -> Void
 
-    @State private var email = "a@gmail.com"
-    @State private var password = "123456"
+    @State private var email = ""
+    @State private var password = ""
     @State private var errorMessage: String? = nil
+    @State private var isLoading = false
 
     var body: some View {
-        VStack(spacing: 15) {
-            Image("Logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 250, height: 250)
+        ZStack {
+            VStack(spacing: 15) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 250, height: 250)
 
-            Text("Log in to your account")
-                .font(.headline)
-                .foregroundColor(.gray)
-                .padding(.top, -10)
+                Text("Log in to your account")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                    .padding(.top, -10)
 
-            TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
+                TextField("Email", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+                    .padding(.horizontal)
+
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
+
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+
+                Button(action: handleLogin) {
+                    Text("Log In")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                }
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
                 .padding(.horizontal)
+                .disabled(isLoading)
 
-            SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
+                Text("or continue with")
+                    .foregroundColor(.gray)
 
-            if let errorMessage = errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.caption)
-            }
-
-            Button(action: handleLogin) {
-                Text("Log In")
+                Button(action: {
+                    print("Continue with Google")
+                }) {
+                    HStack {
+                        Image(systemName: "globe")
+                            .foregroundColor(.red)
+                        Text("Continue with Google")
+                    }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
+                    .background(Color.gray.opacity(0.2))
+                    .foregroundColor(.black)
                     .cornerRadius(10)
-            }
-            .padding(.horizontal)
+                }
+                .padding(.horizontal)
 
-            Text("or continue with")
-                .foregroundColor(.gray)
+                Spacer()
 
-            Button(action: {
-                print("Continue with Google")
-            }) {
                 HStack {
-                    Image(systemName: "globe")
-                        .foregroundColor(.red)
-                    Text("Continue with Google")
+                    Text("Don't have an account?")
+                    Button("Sign up") {
+                        toggleView()
+                    }
+                    .foregroundColor(.blue)
+                    .fontWeight(.bold)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.gray.opacity(0.2))
-                .foregroundColor(.black)
-                .cornerRadius(10)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal)
+            .padding()
 
-            Spacer()
+            // 🔥 Improved Loading Overlay 🔥
+            if isLoading {
+                ZStack {
+                    Color.black.opacity(0.4) // Semi-transparent background
+                        .ignoresSafeArea()
 
-            HStack {
-                Text("Don't have an account?")
-                Button("Sign up") {
-                    toggleView()
+                    VStack(spacing: 10) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5) // Bigger spinner
+                        Text("Signing in...")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                    }
+                    .frame(width: 150, height: 120)
+                    .background(Color.gray.opacity(0.8))
+                    .cornerRadius(15)
                 }
-                .foregroundColor(.blue)
-                .fontWeight(.bold)
             }
-            .padding(.bottom, 20)
         }
-        .padding()
     }
 
     func handleLogin() {
-        if !validateEmail(email) {
+        guard validateEmail(email) else {
             errorMessage = "Invalid email format."
             return
         }
-        if !validatePassword(password) {
+        guard validatePassword(password) else {
             errorMessage = "Password must be at least 6 characters."
             return
         }
 
-        let taskDataModel = TaskDataModel.shared
-        if let user = taskDataModel.validateUser(email: email, password: password) {
-            print("Login successful!")
-            errorMessage = nil
-            onLoginSuccess(user)  // Notify AuthenticationView of successful login
-        } else {
-            errorMessage = "Invalid credentials. Please try again."
+        isLoading = true
+        errorMessage = nil  // Clear previous errors
+
+        Auth.auth().signIn(withEmail: email, password: password) { result, error in
+            DispatchQueue.main.async {
+                isLoading = false
+            }
+            if let error = error {
+                errorMessage = error.localizedDescription
+                return
+            }
+
+            guard let userId = result?.user.uid else {
+                errorMessage = "User ID not found."
+                return
+            }
+
+            fetchUserDetails(userId: userId)
+        }
+    }
+
+    func fetchUserDetails(userId: String) {
+        let db = Firestore.firestore()
+
+        db.collection("users").document(userId).getDocument { snapshot, error in
+            if let error = error {
+                errorMessage = "Failed to fetch user details: \(error.localizedDescription)"
+                return
+            }
+
+            guard let data = snapshot?.data() else {
+                errorMessage = "No user data found."
+                return
+            }
+
+            let name = data["name"] as? String ?? "Unknown"
+            let email = data["email"] as? String ?? ""
+            let password = data["password"] as? String ?? "" // Ensure it's stored in Firestore
+            let phone = data["phone"] as? String
+
+            DispatchQueue.main.async {
+                let user = User(name: name, email: email, password: password) // Use existing init
+                onLoginSuccess(user)
+            }
         }
     }
 
@@ -131,8 +194,7 @@ struct LoginView: View {
     }
 }
 
-
-// Preview
 #Preview {
     AuthenticationView()
 }
+                

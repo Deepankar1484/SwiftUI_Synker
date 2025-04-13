@@ -44,9 +44,7 @@ struct CustomTabBar: View {
                     ProfileView(loggedUser: loggedUser ?? User(
                         name: "Guest",
                         email: "guest@example.com",
-                        password: "",
-                        phone: "N/A",
-                        settings: Settings(usage: .personal, bedtime: "10:00 PM", wakeUpTime: "6:00 AM", notificationsEnabled: true)
+                        password: ""
                     ))
                 }
                     .tabItem {

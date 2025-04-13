@@ -1,9 +1,11 @@
 import SwiftUI
+import Firebase
 
 struct UsageScreen: View {
     @State private var selectedUsage: Usage? = nil
     @State private var navigateToNextScreen: Bool = false
     @State private var showAlert: Bool = false
+    let userId: String
 
     var body: some View {
         NavigationStack {
@@ -22,7 +24,6 @@ struct UsageScreen: View {
                     .font(.subheadline)
                     .foregroundColor(.gray)
 
-                // ✅ Selection List (Only one can be selected)
                 ForEach(Usage.allCases, id: \.self) { usage in
                     UsageSelectionRow(usage: usage, isSelected: selectedUsage == usage) {
                         selectedUsage = usage
@@ -31,14 +32,7 @@ struct UsageScreen: View {
 
                 Spacer()
 
-                // ✅ Continue Button
-                Button(action: {
-                    if selectedUsage == nil {
-                        showAlert = true
-                    } else {
-                        navigateToNextScreen = true
-                    }
-                }) {
+                Button(action: continueAction) {
                     Text("Continue")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -48,23 +42,39 @@ struct UsageScreen: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
-                
+                .alert("Please select an option", isPresented: $showAlert) {
+                    Button("OK", role: .cancel) {}
+                }
                 .navigationDestination(isPresented: $navigateToNextScreen) {
-                    WakeUpScreen(settings: Settings(
-                        profilePicture: nil,
-                        usage: selectedUsage ?? .personal, // Default fallback
-                        bedtime: "10:00 PM",
-                        wakeUpTime: "6:30 AM",
-                        notificationsEnabled: true
-                    ))
+                    WakeUpScreen(userId: userId, settings: createSettings())
                 }
             }
             .padding()
         }
     }
+
+    /// Creates an instance of `Settings` with the selected `usage`
+    private func createSettings() -> Settings {
+        return Settings(
+            profilePicture: nil,
+            usage: selectedUsage ?? .personal,
+            bedtime: "10:00 PM",
+            wakeUpTime: "6:30 AM",
+            notificationsEnabled: true
+        )
+    }
+
+    /// Handles continue button action
+    private func continueAction() {
+        if selectedUsage == nil {
+            showAlert = true
+        } else {
+            navigateToNextScreen = true
+        }
+    }
 }
 
-// ✅ Single Selection Row
+// Supporting component for option selection
 struct UsageSelectionRow: View {
     let usage: Usage
     let isSelected: Bool
@@ -73,39 +83,25 @@ struct UsageSelectionRow: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                Image(systemName: usageIcon(for: usage))
-                    .foregroundColor(.purple)
-                    .frame(width: 30)
-
                 Text(usage.rawValue)
                     .font(.headline)
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Circle()
-                    .stroke(isSelected ? Color.purple : Color.gray, lineWidth: 2)
-                    .frame(width: 20, height: 20)
-                    .overlay(
-                        Circle()
-                            .fill(isSelected ? Color.purple : Color.clear)
-                            .frame(width: 10, height: 10)
-                    )
+                    .foregroundColor(.primary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                }
             }
             .padding()
-            .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.5), lineWidth: 1))
+            .frame(maxWidth: .infinity)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(10)
         }
-    }
-
-    func usageIcon(for usage: Usage) -> String {
-        switch usage {
-        case .personal: return "person.fill"
-        case .work: return "briefcase.fill"
-        case .education: return "books.vertical.fill"
-        }
+        .padding(.horizontal)
     }
 }
 
-// ✅ Preview
+// Preview
 #Preview {
-    UsageScreen()
+    UsageScreen(userId: "testUser123")
 }
