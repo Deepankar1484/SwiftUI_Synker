@@ -46,8 +46,9 @@ struct WakeUpScreen: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
-                .navigationDestination(isPresented: $navigateToNextScreen) {
+                .fullScreenCover(isPresented: $navigateToNextScreen) {
                     BedtimeScreen(userId: userId, settings: settings)
+                        .navigationBarHidden(true) // Hide navigation bar
                 }
             }
             .padding()

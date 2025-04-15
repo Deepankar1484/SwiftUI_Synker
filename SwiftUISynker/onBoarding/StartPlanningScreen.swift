@@ -2,7 +2,7 @@ import SwiftUI
 
 struct StartPlanningScreen: View {
     let userId: String // Accept userId as a parameter
-
+    @State private var navigateToUsageScreen = false
     var body: some View {
         NavigationView {
             VStack {
@@ -28,7 +28,10 @@ struct StartPlanningScreen: View {
                 
                 Spacer()
                 
-                NavigationLink(destination: UsageScreen(userId: userId)) { // Pass userId to next screen
+                // Replace NavigationLink with this button:
+                Button {
+                    navigateToUsageScreen = true // New @State variable
+                } label: {
                     Text("Start Planning")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -38,8 +41,13 @@ struct StartPlanningScreen: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
+                .fullScreenCover(isPresented: $navigateToUsageScreen) {
+                    UsageScreen(userId: userId) // Opens in a new modal context
+                        .navigationBarHidden(true) // Ensures no toolbar appears
+                }
             }
             .padding()
+            
         }
     }
 }

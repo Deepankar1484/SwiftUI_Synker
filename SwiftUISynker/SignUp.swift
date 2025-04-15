@@ -60,24 +60,8 @@ struct SignupView: View {
                 .disabled(fullName.isEmpty || email.isEmpty || password.isEmpty || isLoading)
                 .padding(.horizontal)
                 
-                Text("or continue with")
-                    .foregroundColor(.gray)
                 
-                Button(action: {
-                    print("Continue with Google")
-                }) {
-                    HStack {
-                        Image(systemName: "globe")
-                            .foregroundColor(.red)
-                        Text("Continue with Google")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .foregroundColor(.black)
-                    .cornerRadius(10)
-                }
-                .padding(.horizontal)
+                
                 
                 Spacer()
                 
@@ -91,14 +75,13 @@ struct SignupView: View {
                 }
                 .padding(.bottom, 20)
                 
-                NavigationLink(
-                    destination: StartPlanningScreen(userId: userId ?? ""),
-                    isActive: $navigateToStartPlanning
-                ) {
-                    EmptyView()
+                .fullScreenCover(isPresented: $navigateToStartPlanning) {
+                    StartPlanningScreen(userId: userId ?? "")
+                        .navigationBarHidden(true) // Ensure no navigation bar appears
                 }
             }
             .padding()
+            
         }
     }
     

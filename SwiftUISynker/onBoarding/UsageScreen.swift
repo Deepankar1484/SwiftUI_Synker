@@ -45,8 +45,9 @@ struct UsageScreen: View {
                 .alert("Please select an option", isPresented: $showAlert) {
                     Button("OK", role: .cancel) {}
                 }
-                .navigationDestination(isPresented: $navigateToNextScreen) {
+                .fullScreenCover(isPresented: $navigateToNextScreen) {
                     WakeUpScreen(userId: userId, settings: createSettings())
+                        .navigationBarHidden(true) // Hide navigation bar
                 }
             }
             .padding()

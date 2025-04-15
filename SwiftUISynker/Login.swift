@@ -72,25 +72,7 @@ struct LoginView: View {
                 .padding(.horizontal)
                 .disabled(isLoading)
 
-                Text("or continue with")
-                    .foregroundColor(.gray)
-
-                Button(action: {
-                    print("Continue with Google")
-                }) {
-                    HStack {
-                        Image(systemName: "globe")
-                            .foregroundColor(.red)
-                        Text("Continue with Google")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .foregroundColor(.black)
-                    .cornerRadius(10)
-                }
-                .padding(.horizontal)
-
+                
                 Spacer()
 
                 HStack {
@@ -197,4 +179,3 @@ struct LoginView: View {
 #Preview {
     AuthenticationView()
 }
-                

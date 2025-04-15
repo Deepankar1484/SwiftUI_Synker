@@ -4,15 +4,11 @@ import FirebaseFirestore
 struct BedtimeScreen: View {
     var userId: String
     @State private var settings: Settings
-    @State private var selectedTime: Date = Date()
+    @State private var bedtimeTime: Date = Calendar.current.date(bySettingHour: 22, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var showLogo = false
     @State private var moveLogoToTop = false
     @State private var showSuccessMessage = false
-    @State private var navigateToHome = false
-    @State private var showMainScreen = true
-    
-    // Add this for programmatic navigation
-    @Environment(\.dismiss) private var dismiss
+    @State private var contentOpacity: Double = 1.0
     
     init(userId: String, settings: Settings) {
         self.userId = userId
@@ -20,41 +16,36 @@ struct BedtimeScreen: View {
     }
 
     var body: some View {
-        ZStack {
-            if showMainScreen {
+        NavigationStack {
+            ZStack {
+                // Main Content
                 VStack(alignment: .leading, spacing: 20) {
-                    // 🔴 Progress Bar at the Top
                     ProgressView(value: 0.8)
                         .progressViewStyle(LinearProgressViewStyle())
                         .tint(.red)
                         .padding(.top, 10)
-
+                    
                     Text("When will you go to bed?")
                         .font(.title2)
                         .fontWeight(.bold)
                         .padding(.top, 10)
-
+                    
                     Text("Setting a clear sleep goal can help regulate your body's internal clock.")
                         .font(.subheadline)
                         .foregroundColor(.gray)
-
+                    
+                    Text("Bedtime")
+                        .font(.headline)
+                        .foregroundColor(.gray)
+                    
+                    DatePicker("", selection: $bedtimeTime, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(WheelDatePickerStyle())
+                        .labelsHidden()
+                        .padding()
+                    
                     Spacer()
-
-                    // 📅 Centered DatePicker
-                    HStack {
-                        Spacer()
-                        DatePicker("", selection: $selectedTime, displayedComponents: .hourAndMinute)
-                            .datePickerStyle(.wheel)
-                            .labelsHidden()
-                        Spacer()
-                    }
-
-                    Spacer()
-
-                    Button(action: {
-                        settings.bedtime = formatTime(date: selectedTime)
-                        updateBedtimeInFirestore()
-                    }) {
+                    
+                    Button(action: updateBedtimeAndContinue) {
                         Text("Continue")
                             .font(.headline)
                             .foregroundColor(.white)
@@ -66,67 +57,64 @@ struct BedtimeScreen: View {
                     .padding(.horizontal)
                 }
                 .padding()
-            }
-
-            if showLogo {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 300, height: 300)
-                    .offset(y: moveLogoToTop ? -UIScreen.main.bounds.height / 3 : 0)
-                    .animation(.easeInOut(duration: 1), value: moveLogoToTop)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            moveLogoToTop = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                                showSuccessMessage = true
-                            }
-                        }
-                    }
-            }
-
-            if showSuccessMessage {
-                VStack {
-                    Spacer()
-
-                    Text("Amazing!")
-                        .font(.largeTitle)
-                        .bold()
-                        .opacity(showSuccessMessage ? 1 : 0)
-                        .animation(.easeIn(duration: 0.5), value: showSuccessMessage)
-
-                    Text("Your account is now ready to use.")
-                        .foregroundColor(.gray)
-                        .opacity(showSuccessMessage ? 1 : 0)
-                        .animation(.easeIn(duration: 0.7), value: showSuccessMessage)
-
-                    Spacer()
-
-                    Button(action: {
-                        // Replace current navigation stack with AuthenticationView
-                        navigateToAuthenticationView()
-                    }) {
-                        Text("Proceed To Login")
-                            .foregroundColor(.white)
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
-                    .padding(.horizontal)
-                    .opacity(showSuccessMessage ? 1 : 0)
-                    .animation(.easeIn(duration: 0.9), value: showSuccessMessage)
+                .opacity(contentOpacity)
+                .animation(.easeInOut(duration: 0.5), value: contentOpacity)
+                
+                // Success Animation
+                if showLogo {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 300, height: 300)
+                        .offset(y: moveLogoToTop ? -UIScreen.main.bounds.height / 3 : 0)
+                        .animation(.easeInOut(duration: 1.0), value: moveLogoToTop)
+                        .transition(.opacity.combined(with: .scale))
                 }
-                .padding()
+                
+                if showSuccessMessage {
+                    VStack {
+                        Spacer()
+                        
+                        Text("Amazing!")
+                            .font(.largeTitle)
+                            .bold()
+                            .transition(.scale.combined(with: .opacity))
+                        
+                        Text("Your account is now ready to use.")
+                            .foregroundColor(.gray)
+                            .transition(.opacity)
+                        
+                        Spacer()
+                        
+                        Button(action: navigateToAuthenticationView) {
+                            Text("Proceed To Login")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(10)
+                        }
+                        .padding(.horizontal)
+                        .transition(.move(edge: .bottom))
+                    }
+                    .padding()
+                    .transition(.opacity)
+                }
             }
+            .navigationBarHidden(true)
         }
-        .navigationBarBackButtonHidden(true) // Hide the back button in this screen
     }
-
-    private func updateBedtimeInFirestore() {
-        let db = Firestore.firestore()
+    
+    private func updateBedtimeAndContinue() {
+        settings.bedtime = formatTime(date: bedtimeTime)
         
+        // First fade out the content
+        withAnimation(.easeInOut(duration: 0.5)) {
+            contentOpacity = 0
+        }
+        
+        let db = Firestore.firestore()
         let updatedSettings: [String: Any] = [
             "profilePicture": settings.profilePicture ?? "",
             "usage": settings.usage.rawValue,
@@ -134,21 +122,32 @@ struct BedtimeScreen: View {
             "wakeUpTime": settings.wakeUpTime,
             "notificationsEnabled": false
         ]
-
+        
         db.collection("users").document(userId).updateData([
             "settings": updatedSettings
         ]) { error in
             if let error = error {
                 print("Error updating settings: \(error.localizedDescription)")
-            } else {
+                // If error, fade content back in
                 withAnimation {
-                    showMainScreen = false
+                    contentOpacity = 1
+                }
+            } else {
+                // Show logo animation
+                withAnimation(.spring()) {
                     showLogo = true
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    moveLogoToTop = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                        showSuccessMessage = true
+                
+                // Sequence the animations
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        moveLogoToTop = true
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        withAnimation(.spring()) {
+                            showSuccessMessage = true
+                        }
                     }
                 }
             }
@@ -156,7 +155,6 @@ struct BedtimeScreen: View {
     }
     
     private func navigateToAuthenticationView() {
-        // This will programmatically replace the entire navigation stack with AuthenticationView
         if let window = UIApplication.shared.windows.first {
             window.rootViewController = UIHostingController(rootView:
                 NavigationStack {
